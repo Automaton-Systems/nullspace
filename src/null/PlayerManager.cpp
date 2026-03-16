@@ -184,7 +184,7 @@ void PlayerManager::Update(float dt) {
     if (player->enter_delay > 0.0f) {
       player->enter_delay -= dt;
 
-      if (!explode_animation.IsAnimating(player->explode_anim_t)) {
+      if (connection.settings.EnterDelay > 0 && !explode_animation.IsAnimating(player->explode_anim_t)) {
         if (player != self) {
           player->position = Vector2f(0, 0);
           player->lerp_time = 0.0f;
@@ -193,7 +193,7 @@ void PlayerManager::Update(float dt) {
         player->velocity = Vector2f(0, 0);
       }
 
-      if (player == self && player->enter_delay <= 0.0f) {
+      if (player == self && player->enter_delay <= 0.0f && connection.settings.EnterDelay > 0) {
         Spawn();
         player->warp_anim_t = 0.0f;
       }
@@ -1614,7 +1614,7 @@ void PlayerManager::SimulatePlayer(Player& player, float dt, bool extrapolating)
     float energy_cost = player.energy * 0.8f;
 
     if (connection.send_damage) {
-      WeaponData wd = { WeaponType::Wormhole, 0, 0, 0, 0, 0 };
+      WeaponData wd = {WeaponType::Wormhole, 0, 0, 0, 0, 0};
       PushDamage(this->player_id, wd, (int)player.energy, (int)energy_cost);
     }
 
