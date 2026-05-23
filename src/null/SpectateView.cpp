@@ -145,8 +145,8 @@ void SpectateView::Render(Camera& ui_camera, SpriteRenderer& renderer) {
   if (!self) return;
   if (self->ship != 8) return;
 
-  // TODO: find real position for indicators
-  float y = (ui_camera.surface_dim.y * 0.57f) + 1.0f;
+  // Position icons below FPS to avoid radar overlap on small/scaled screens
+  float y = 50.0f;
   float x = ui_camera.surface_dim.x - 26;
   size_t icon_index = (self->togglables & Status_XRadar) ? 36 : 37;
 

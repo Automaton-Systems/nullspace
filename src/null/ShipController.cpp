@@ -931,8 +931,8 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
 
   RenderEnergyDisplay(ui_camera, renderer);
 
-  // TODO: Find real position
-  float y_top = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
+  // Position icons below FPS to avoid radar overlap on small/scaled screens
+  float y_top = 50.0f;
   float y = y_top;
 
   RenderItemIndicator(ui_camera, renderer, ship.bursts, 30, &y);
