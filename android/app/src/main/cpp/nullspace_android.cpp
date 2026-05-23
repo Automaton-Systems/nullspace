@@ -76,8 +76,8 @@ struct ServerInfo {
 
 ServerInfo kServers[] = {
     {"emulator", "10.0.2.2", 5000},
-    {"local", "192.168.7.243", 5000},
-    {"subgame", "192.168.7.243", 5002},
+    {"local", "192.168.7.168", 5000},
+    {"subgame", "192.168.7.168", 5002},
     {"SSCE Hyperspace", "162.248.95.143", 5005},
     {"SSCJ Devastation", "69.164.220.203", 7022},
     {"SSCJ MetalGear CTF", "69.164.220.203", 14000},
@@ -105,8 +105,10 @@ struct nullspace {
   WorkQueue* work_queue;
   Worker* worker;
   Game* game = nullptr;
-  int surface_width = 0;
+  int surface_width = 0;  // Logical dimensions (DPI-scaled)
   int surface_height = 0;
+  int physical_width = 0;  // Physical screen dimensions
+  int physical_height = 0;
   char name[20];
   char password[20];
   GameScreen screen = GameScreen::MainMenu;
@@ -197,8 +199,9 @@ struct nullspace {
 
     WantTextInputLast = io.WantTextInput;
 
-    io.DisplayFramebufferScale.x = surface_width / io.DisplaySize.x;
-    io.DisplayFramebufferScale.y = surface_height / io.DisplaySize.y;
+    // Use physical dimensions for ImGui framebuffer scaling
+    io.DisplayFramebufferScale.x = physical_width / io.DisplaySize.x;
+    io.DisplayFramebufferScale.y = physical_height / io.DisplaySize.y;
 
     if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
       JoinZone(selected_zone_index);
@@ -434,21 +437,53 @@ void init(struct android_app* app) {
   ImGui_ImplAndroid_Init(g_App->window);
   ImGui_ImplOpenGL3_Init("#version 300 es");
 
-  // Load Fonts
+  // Calculate scale based on display density for better DPI awareness
+  // Base scale of 3.0f works well for 420 dpi displays (like emulator)
+  // Scale proportionally for higher/lower DPI displays
+  AConfiguration* config = AConfiguration_new();
+  AConfiguration_fromAssetManager(config, g_App->activity->assetManager);
+  int32_t density = AConfiguration_getDensity(config);
+  AConfiguration_delete(config);
+  
+  const float kBaseDensity = 420.0f;
+  const float kBaseScale = 3.0f;
+  const float kGameScaleMultiplier = 1.8f;  // Extra scaling for in-game rendering only
+  
+  // Base DPI scale for font sizing
+  float base_dpi_scale = density / kBaseDensity;
+  
+  // ImGui menu uses original base scale for element sizing (not DPI scaled)
+  null::g_nullspace.scale = kBaseScale;
+  
+  // Game scale with multiplier for logical dimensions (in-game rendering only)
+  float game_dpi_scale = base_dpi_scale * kGameScaleMultiplier;
+  
+  // Load Fonts with increased DPI scaling for better readability on high-DPI displays
   ImFontConfig font_cfg;
-  font_cfg.SizePixels = 22.0f;
+  font_cfg.SizePixels = 22.0f * base_dpi_scale * 1.5f;  // 1.5x larger font
   io.Fonts->AddFontDefault(&font_cfg);
-
-  // Arbitrary scale-up
-  // FIXME: Put some effort into DPI awareness
-  null::g_nullspace.scale = 3.0f;
-  ImGui::GetStyle().ScaleAllSizes(null::g_nullspace.scale);
+  
+  // Calculate logical dimensions for game rendering (with extra multiplier for larger UI)
+  // The game will render to these logical dimensions, and OpenGL will scale to physical resolution
+  int logical_width = (int)(surface_width / game_dpi_scale);
+  int logical_height = (int)(surface_height / game_dpi_scale);
+  
+  __android_log_print(ANDROID_LOG_INFO, g_LogTag, 
+                      "Display density: %d, Base DPI: %.2f, Game DPI: %.2f, Physical: %dx%d, Logical: %dx%d", 
+                      density, base_dpi_scale, game_dpi_scale, surface_width, surface_height, logical_width, logical_height);
+  
+  // Don't scale ImGui style - keep elements at original size
+  // (Font is already scaled, windows use scale variable for sizing)
 
   g_Initialized = true;
 
   null::g_nullspace.Initialize();
-  null::g_nullspace.surface_width = surface_width;
-  null::g_nullspace.surface_height = surface_height;
+  // Store logical dimensions for game rendering (DPI-scaled)
+  null::g_nullspace.surface_width = logical_width;
+  null::g_nullspace.surface_height = logical_height;
+  // Store physical dimensions for framebuffer scaling
+  null::g_nullspace.physical_width = surface_width;
+  null::g_nullspace.physical_height = surface_height;
 
   glViewport(0, 0, surface_width, surface_height);
 }

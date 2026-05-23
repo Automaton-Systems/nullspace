@@ -68,5 +68,20 @@ Use the existing Visual Studio solution or install cmake. Choose Release x64 bui
 6. `make`
 
 ### Android
-Use the provided gradlew in the android folder.  
-This version doesn't support input and isn't really maintained, so it might not compile.
+1. Ensure git submodules are initialized: `git submodule init && git submodule update`
+2. Copy game resources to `android/app/src/main/assets/`:
+   - `graphics/` folder with sprite sheets (.bm2, .png, or .gif files)
+   - `sound/` folder with audio files (.wa2 files)
+3. Create `android/local.properties` with your Android SDK path:
+   ```
+   sdk.dir=/path/to/Android/Sdk
+   ```
+4. Update `android/app/build.gradle` CMake version to match installed version (e.g., `3.22.1`)
+5. Set `JAVA_HOME` to Java 17+ (e.g., from Android Studio's bundled JDK)
+6. Build and install:
+   ```bash
+   cd android
+   ./gradlew installDebug
+   ```
+
+**Note:** This is a spectator-only client. Touch controls: drag to move camera, double-tap to spectate players, long-press for menu.
