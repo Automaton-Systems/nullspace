@@ -478,20 +478,33 @@ void TileRenderer::RenderRadar(Map& map, MemoryArena& temp_arena, u32 dimensions
 }
 
 u32 TileRenderer::GetRadarTileColor(u8 id, u16 x, u16 y, Soccer& soccer) {
-  // TODO: other types
+  // Empty space
   if (id == 0 || id > 241) {
     return 0xFF0A190A;
   } else if (id == 171) {
+    // Safe zone (green)
     return 0xFF185218;
   } else if (id == 172) {
+    // Goal
     if (soccer.IsTeamGoal(Vector2f(x, y))) {
       return 0xFF219CAD;
     }
     return 0xFF0839FF;
   } else if (id >= 162 && id <= 169) {
+    // Doors (light gray)
     return 0xFFADADAD;
+  } else if (id == 220) {
+    // Wormhole (dark purple)
+    return 0xFF660099;
+  } else if (id >= 216 && id <= 218) {
+    // Asteroids (brown/orange)
+    return 0xFF2B5A8B;
+  } else if (id == 219) {
+    // Space station (medium gray)
+    return 0xFF808080;
   }
 
+  // Normal walls (dark gray)
   return 0xFF5a5a5a;
 }
 
