@@ -825,8 +825,7 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 
   if (!self || self->ship == 8) return;
 
-  // Old energy digit display removed - now shown below health bar
-  /*
+#ifndef __ANDROID__
   int energy = (int)self->energy;
 
   int count = 0;
@@ -838,7 +837,7 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 
     energy /= 10;
   }
-  */
+#endif
 
   RenderIndicators(ui_camera, renderer);
 
@@ -882,8 +881,11 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, Animation* animation, float y,
                                  float duration, TextColor color, bool percent = false) {
   SpriteRenderable& renderable = animation->GetFrame();
-  // Render on LEFT side below FPS (x=0) instead of right side
+#ifdef __ANDROID__
   Vector2f position(0, y - renderable.dimensions.y * 0.5f);
+#else
+  Vector2f position(ui_camera.surface_dim.x - renderable.dimensions.x, y - renderable.dimensions.y * 0.5f);
+#endif
 
   renderer.Draw(ui_camera, renderable, position, Layer::Gauges);
 
@@ -895,8 +897,11 @@ inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, An
     sprintf(duration_text, "%.1f", duration);
   }
 
-  // Text offset to the right of the icon (was offset left when on right side)
+#ifdef __ANDROID__
   renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(renderable.dimensions.x + 2, 4), Layer::Gauges, TextAlignment::Left);
+#else
+  renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(0, 4), Layer::Gauges, TextAlignment::Right);
+#endif
 }
 
 void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& renderer) {
@@ -936,10 +941,11 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
 
   RenderEnergyDisplay(ui_camera, renderer);
 
-  // Position left item icons using same approach as weapon buttons
-  // Icons stack upward from bottom: 7 items × 25px = 175px total height
-  float item_stack_height = 175.0f;
-  float y = ui_camera.surface_dim.y - item_stack_height - 10.0f;  // 10px margin like buttons
+#ifdef __ANDROID__
+  float y = ui_camera.surface_dim.y - 175.0f - 10.0f;
+#else
+  float y = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
+#endif
 
   RenderItemIndicator(ui_camera, renderer, ship.bursts, 30, &y);
   RenderItemIndicator(ui_camera, renderer, ship.repels, 31, &y);
@@ -950,9 +956,11 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   RenderItemIndicator(ui_camera, renderer, ship.portals, 46, &y);
 
   float x = ui_camera.surface_dim.x - 26;
-  // Position right-side icons same way: 6 items × 25px = 150px total height  
-  float right_stack_height = 150.0f;
-  y = ui_camera.surface_dim.y - right_stack_height - 10.0f;
+#ifdef __ANDROID__
+  y = ui_camera.surface_dim.y - 150.0f - 10.0f;
+#else
+  y = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
+#endif
   size_t gun_index = GetGunIconIndex();
   if (gun_index != 0xFFFFFFFF) {
     renderer.Draw(ui_camera, Graphics::icon_sprites[gun_index], Vector2f(x, y), Layer::Gauges);
@@ -1012,7 +1020,8 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
     renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
   }
   y += 25.0f;
-  
+
+#ifdef __ANDROID__
   // Weapon buttons: GUN and BOMB (round, grey border, blue fill, white text)
   float button_size = 72.0f;
   float button_radius = button_size / 2.0f;
@@ -1107,6 +1116,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
     SpriteRenderable seg = Graphics::GetColor(ColorType::Safe, Vector2f(1.0f, height));
     renderer.Draw(ui_camera, seg, Vector2f(dpad_x + arrow_offset + dx, dpad_y - height/2), Layer::AfterChat);
   }
+#endif  // __ANDROID__
 }
 
 void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& renderer) {
@@ -1120,14 +1130,19 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   Vector2f health_position(ui_camera.surface_dim.x * 0.5f - healthbar.dimensions.x * 0.5f, 0);
 
   SpriteRenderable top_display_full = Graphics::anim_health_high.frames[5];
-  top_display_full.dimensions = Vector2f(160, 2);
+#ifdef __ANDROID__
+  const float kBarWidth = 160.0f;
+#else
+  const float kBarWidth = 240.0f;
+#endif
+  top_display_full.dimensions = Vector2f(kBarWidth, 2);
 
   SpriteRenderable top_display = Graphics::anim_health_high.frames[0];
 
   float ship_energy_percent =
       (float)ship.energy / player_manager.connection.settings.ShipSettings[self->ship].MaximumEnergy;
 
-  top_display.dimensions = Vector2f(ship_energy_percent * 160, 2);
+  top_display.dimensions = Vector2f(ship_energy_percent * kBarWidth, 2);
 
   float energy_percent = self->energy / ship.energy;
   float view_width = energy_percent * top_display.dimensions.x;
@@ -1143,7 +1158,7 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   SpriteRenderable energy_display = health_animation.GetFrame();
   energy_display.dimensions = Vector2f(view_width, 6);
 
-  renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(160, 4), Layer::Gauges);
+  renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(kBarWidth, 4), Layer::Gauges);
   renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(0, 4), Layer::Gauges);
 
   renderer.Draw(ui_camera, top_display, health_center - Vector2f(top_display.dimensions.x, 4), Layer::Gauges);
@@ -1153,13 +1168,14 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   renderer.Draw(ui_camera, energy_display, health_center, Layer::Gauges);
 
   renderer.Draw(ui_camera, healthbar, health_position, Layer::Gauges);
-  
-  // Display ship energy as small text centered below the bar
+
+#ifdef __ANDROID__
   char energy_text[16];
   sprintf(energy_text, "%d", (int)ship.energy);
-  renderer.DrawText(ui_camera, energy_text, TextColor::Blue, 
-                    Vector2f(health_center.x, healthbar.dimensions.y + 2), 
+  renderer.DrawText(ui_camera, energy_text, TextColor::Blue,
+                    Vector2f(health_center.x, healthbar.dimensions.y + 2),
                     Layer::Gauges, TextAlignment::Center);
+#endif
 }
 
 void ShipController::RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index,

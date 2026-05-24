@@ -111,6 +111,9 @@ struct Game {
   void RenderJoin(float dt);
 
   void RenderMenu();
+#ifdef __ANDROID__
+  void RenderMenuAndroid();
+#endif
   bool HandleMenuKey(int codepoint, int mods);
 
   void RecreateRadar();

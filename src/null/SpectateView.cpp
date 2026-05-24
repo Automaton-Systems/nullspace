@@ -145,9 +145,11 @@ void SpectateView::Render(Camera& ui_camera, SpriteRenderer& renderer) {
   if (!self) return;
   if (self->ship != 8) return;
 
-  // Position icon at bottom using same approach as weapon buttons
-  float icon_height = 25.0f;
-  float y = ui_camera.surface_dim.y - icon_height - 10.0f;
+#ifdef __ANDROID__
+  float y = ui_camera.surface_dim.y - 25.0f - 10.0f;
+#else
+  float y = (ui_camera.surface_dim.y * 0.57f) + 1.0f;
+#endif
   float x = ui_camera.surface_dim.x - 26;
   size_t icon_index = (self->togglables & Status_XRadar) ? 36 : 37;
 
