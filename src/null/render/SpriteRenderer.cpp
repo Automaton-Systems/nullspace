@@ -274,48 +274,55 @@ void SpriteRenderer::Draw(Camera& camera, const SpriteRenderable& renderable, co
 }
 
 void SpriteRenderer::Render(Camera& camera) {
+  SpritePushElement* begin = (SpritePushElement*)push_buffer.base;
+  SpritePushElement* end = (SpritePushElement*)push_buffer.current;
+
+  if (begin >= end) {
+    push_buffer.Reset();
+    texture_push_buffer.Reset();
+    return;
+  }
+
   shader.Use();
   glBindVertexArray(vao);
-
   glActiveTexture(GL_TEXTURE0);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
   mat4 proj = camera.GetProjection();
   mat4 view = camera.GetView();
   mat4 mvp = proj * view;
-
   glUniformMatrix4fv(mvp_uniform, 1, GL_FALSE, (const GLfloat*)mvp.data);
 
-  SpritePushElement* element = (SpritePushElement*)push_buffer.base;
-  GLuint* texture_ptr = (GLuint*)texture_push_buffer.base;
+  GLsizei total_sprites = (GLsizei)(end - begin);
+  GLsizeiptr total_bytes = total_sprites * (GLsizeiptr)sizeof(SpritePushElement);
 
+  // Upload ALL sprites at once with glBufferData (buffer orphaning).
+  // This allocates new GPU storage so the CPU never waits for in-flight GPU reads
+  // from the previous call — eliminates the glBufferSubData sync stall on mobile.
+  glBufferData(GL_ARRAY_BUFFER, total_bytes, push_buffer.base, GL_STREAM_DRAW);
+
+  // Walk texture_push_buffer, issuing one glDrawArrays per texture-group
+  // using vertex-index offsets into the already-uploaded VBO.
+  GLuint* texture_ptr = (GLuint*)texture_push_buffer.base;
   GLuint current_texture = *texture_ptr;
-  GLsizei vertex_count = 0;
   glBindTexture(GL_TEXTURE_2D, current_texture);
 
-  void* draw_base = push_buffer.base;
+  GLsizei batch_start = 0;   // in vertices (6 per sprite)
+  GLsizei batch_count = 0;
 
-  while (element < (SpritePushElement*)push_buffer.current) {
-    GLuint element_texture = *texture_ptr;
-
-    if (element_texture != current_texture) {
-      glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_count * sizeof(SpriteVertex), draw_base);
-      glDrawArrays(GL_TRIANGLES, 0, vertex_count);
-      glBindTexture(GL_TEXTURE_2D, element_texture);
-
-      current_texture = element_texture;
-      draw_base = element;
-      vertex_count = 0;
+  for (GLsizei i = 0; i < total_sprites; ++i) {
+    GLuint tex = texture_ptr[i];
+    if (tex != current_texture) {
+      glDrawArrays(GL_TRIANGLES, batch_start, batch_count);
+      current_texture = tex;
+      glBindTexture(GL_TEXTURE_2D, current_texture);
+      batch_start += batch_count;
+      batch_count = 0;
     }
-
-    vertex_count += 6;
-    ++element;
-    ++texture_ptr;
+    batch_count += 6;
   }
-
-  if (vertex_count > 0) {
-    glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_count * sizeof(SpriteVertex), draw_base);
-    glDrawArrays(GL_TRIANGLES, 0, vertex_count);
+  if (batch_count > 0) {
+    glDrawArrays(GL_TRIANGLES, batch_start, batch_count);
   }
 
   push_buffer.Reset();

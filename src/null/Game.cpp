@@ -643,7 +643,6 @@ void Game::Render(float dt) {
 
   char fps_text[32];
   sprintf(fps_text, "FPS: %d", (int)(fps + 0.5f));
-  // Move FPS to top-left below player card (around y=40)
   sprite_renderer.DrawText(ui_camera, fps_text, TextColor::Pink, Vector2f(0, 40), Layer::TopMost,
                            TextAlignment::Left);
 
@@ -693,11 +692,11 @@ void Game::RenderGame(float dt) {
     weapon_manager.Render(camera, ui_camera, sprite_renderer, dt, radar_visibility);
     player_manager.Render(camera, sprite_renderer);
 
+    // Single world-space flush: all weapons, players, animated tiles batched together.
+    // Using glBufferData (stream draw) in Render() avoids CPU-GPU sync stalls on mobile.
     sprite_renderer.Render(camera);
 
     ship_controller.Render(ui_camera, camera, sprite_renderer);
-
-    sprite_renderer.Render(camera);
 
     for (size_t i = 0; i < flag_count; ++i) {
       GameFlag* flag = flags + i;
@@ -723,6 +722,8 @@ void Game::RenderGame(float dt) {
 
   statbox.Render(ui_camera, sprite_renderer);
   specview.Render(ui_camera, sprite_renderer);
+
+  // Single UI-space flush: HUD, radar, chat, ship controller, all UI sprites.
   sprite_renderer.Render(ui_camera);
 }
 

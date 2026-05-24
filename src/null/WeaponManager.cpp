@@ -16,8 +16,6 @@
 #include <assert.h>
 #include <math.h>
 
-#include <chrono>
-
 namespace null {
 
 AudioType GetAudioType(ShipSettings& ship_settings, WeaponData data) {
@@ -685,16 +683,15 @@ void WeaponManager::Render(Camera& camera, Camera& ui_camera, SpriteRenderer& re
     }
   }
 
-  renderer.Render(camera);
-
+  // NOTE: We intentionally do NOT call renderer.Render() here.
+  // Weapon sprites (and decoy radar blips) are deferred and flushed by the game
+  // loop in a single batched Render() call, which avoids CPU-GPU sync stalls on
+  // mobile (glBufferSubData blocks until the GPU finishes reading).
   if (self && radar) {
     for (size_t i = 0; i < decoy_count; ++i) {
       DecoyRenderRequest* request = decoys + i;
-
       radar->RenderDecoy(ui_camera, renderer, *self, *request->player, request->position);
     }
-
-    renderer.Render(ui_camera);
   }
 
   temp_arena.Revert(snapshot);
