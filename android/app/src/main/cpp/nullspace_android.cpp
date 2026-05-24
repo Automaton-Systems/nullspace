@@ -18,8 +18,10 @@
 static EGLDisplay g_EglDisplay = EGL_NO_DISPLAY;
 static EGLSurface g_EglSurface = EGL_NO_SURFACE;
 static EGLContext g_EglContext = EGL_NO_CONTEXT;
+static EGLConfig g_EglConfig = nullptr;
 static struct android_app* g_App = NULL;
 static bool g_Initialized = false;
+static bool g_EglContextCreated = false;  // true once display/context/resources are up
 static char g_LogTag[] = "nullspace";
 
 static struct {
@@ -60,6 +62,8 @@ static int ShowSoftKeyboardInput();
 static int PollUnicodeChars();
 static void SetPlatform();
 void shutdown();
+static void destroySurfaceOnly();
+static bool ensureSurface();
 
 namespace null {
 
@@ -354,7 +358,14 @@ struct nullspace {
       game->Render(dt);
     }
 
-    eglSwapBuffers(g_EglDisplay, g_EglSurface);
+    EGLBoolean swapResult = eglSwapBuffers(g_EglDisplay, g_EglSurface);
+    if (swapResult == EGL_FALSE) {
+      EGLint err = eglGetError();
+      __android_log_print(ANDROID_LOG_WARN, g_LogTag, "eglSwapBuffers failed: 0x%x — destroying surface", err);
+      if (err == EGL_BAD_SURFACE || err == EGL_CONTEXT_LOST || err == EGL_BAD_NATIVE_WINDOW) {
+        destroySurfaceOnly();
+      }
+    }
 
     auto end = std::chrono::high_resolution_clock::now();
     frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
@@ -416,9 +427,16 @@ void init(struct android_app* app) {
     if (g_EglContext == EGL_NO_CONTEXT)
       __android_log_print(ANDROID_LOG_ERROR, g_LogTag, "%s", "eglCreateContext() returned EGL_NO_CONTEXT");
 
-    g_EglSurface = eglCreateWindowSurface(g_EglDisplay, egl_config, g_App->window, NULL);
+    // Store config globally so we can recreate surface later without full reinit
+    g_EglConfig = egl_config;
+    g_EglContextCreated = true;
 
-    eglMakeCurrent(g_EglDisplay, g_EglSurface, g_EglSurface, g_EglContext);
+    g_EglSurface = eglCreateWindowSurface(g_EglDisplay, g_EglConfig, g_App->window, NULL);
+    if (g_EglSurface == EGL_NO_SURFACE)
+      __android_log_print(ANDROID_LOG_ERROR, g_LogTag, "eglCreateWindowSurface failed: 0x%x", eglGetError());
+
+    if (eglMakeCurrent(g_EglDisplay, g_EglSurface, g_EglSurface, g_EglContext) != EGL_TRUE)
+      __android_log_print(ANDROID_LOG_ERROR, g_LogTag, "eglMakeCurrent failed: 0x%x", eglGetError());
 
     if (!gladLoadGLES2Loader((GLADloadproc)eglGetProcAddress)) {
       __android_log_print(ANDROID_LOG_ERROR, g_LogTag, "%s", "Failed to initialize glad loader.");
@@ -503,8 +521,44 @@ void init(struct android_app* app) {
   glViewport(0, 0, surface_width, surface_height);
 }
 
+static void destroySurfaceOnly() {
+  if (g_EglDisplay != EGL_NO_DISPLAY && g_EglSurface != EGL_NO_SURFACE) {
+    __android_log_print(ANDROID_LOG_INFO, g_LogTag, "%s", "Destroying EGL surface only (keeping context alive)");
+    eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    eglDestroySurface(g_EglDisplay, g_EglSurface);
+    g_EglSurface = EGL_NO_SURFACE;
+  }
+}
+
+static bool ensureSurface() {
+  if (g_EglSurface != EGL_NO_SURFACE) return true;
+  if (!g_EglContextCreated) return false;
+  if (g_App == nullptr || g_App->window == nullptr) return false;
+
+  __android_log_print(ANDROID_LOG_INFO, g_LogTag, "%s", "ensureSurface: recreating EGL surface");
+
+  g_EglSurface = eglCreateWindowSurface(g_EglDisplay, g_EglConfig, g_App->window, nullptr);
+  if (g_EglSurface == EGL_NO_SURFACE) {
+    __android_log_print(ANDROID_LOG_ERROR, g_LogTag, "ensureSurface: eglCreateWindowSurface failed: 0x%x", eglGetError());
+    return false;
+  }
+
+  if (eglMakeCurrent(g_EglDisplay, g_EglSurface, g_EglSurface, g_EglContext) != EGL_TRUE) {
+    __android_log_print(ANDROID_LOG_ERROR, g_LogTag, "ensureSurface: eglMakeCurrent failed: 0x%x", eglGetError());
+    eglDestroySurface(g_EglDisplay, g_EglSurface);
+    g_EglSurface = EGL_NO_SURFACE;
+    return false;
+  }
+
+  __android_log_print(ANDROID_LOG_INFO, g_LogTag, "%s", "ensureSurface: EGL surface recreated successfully");
+  return true;
+}
+
 void tick() {
   if (g_EglDisplay == EGL_NO_DISPLAY) return;
+
+  // Lazily recreate EGL surface if lost (e.g. resume without INIT_WINDOW on Samsung)
+  if (!ensureSurface()) return;
 
   if (!null::g_nullspace.Update()) {
     exit(0);
@@ -515,7 +569,7 @@ void tick() {
 void shutdown() {
   if (!g_Initialized) return;
 
-  // Cleanup
+  // Full shutdown — only called on actual app exit, not on background/resume
   ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplAndroid_Shutdown();
   ImGui::DestroyContext();
@@ -533,6 +587,8 @@ void shutdown() {
   g_EglDisplay = EGL_NO_DISPLAY;
   g_EglContext = EGL_NO_CONTEXT;
   g_EglSurface = EGL_NO_SURFACE;
+  g_EglConfig = nullptr;
+  g_EglContextCreated = false;
   ANativeWindow_release(g_App->window);
 
   g_Initialized = false;
@@ -547,16 +603,24 @@ static void handleAppCmd(struct android_app* app, int32_t appCmd) {
     case APP_CMD_SAVE_STATE:
       break;
     case APP_CMD_INIT_WINDOW:
-      init(app);
+      // Full init on first launch; ensureSurface() handles subsequent resumes
+      if (!g_Initialized) {
+        init(app);
+      } else {
+        // Window came back — let ensureSurface() recreate lazily in tick()
+        __android_log_print(ANDROID_LOG_INFO, g_LogTag, "%s", "APP_CMD_INIT_WINDOW: already initialized, will recreate surface lazily");
+        ensureSurface();
+      }
       break;
     case APP_CMD_TERM_WINDOW:
-      shutdown();
+      // Only destroy the surface — keep EGLContext and all GL resources alive
+      destroySurfaceOnly();
       break;
     case APP_CMD_GAINED_FOCUS:
-      // Don't need to do anything - window lifecycle handles EGL
+      // Surface may have returned without INIT_WINDOW on Samsung — try lazily
+      ensureSurface();
       break;
     case APP_CMD_LOST_FOCUS:
-      // Don't need to do anything - window lifecycle handles EGL
       break;
   }
 }
