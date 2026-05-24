@@ -19,6 +19,11 @@ static EGLDisplay g_EglDisplay = EGL_NO_DISPLAY;
 static EGLSurface g_EglSurface = EGL_NO_SURFACE;
 static EGLContext g_EglContext = EGL_NO_CONTEXT;
 static EGLConfig g_EglConfig = nullptr;
+static EGLint g_EglFormat = 0;
+static int g_SurfaceBufferWidth = 0;   // width passed to ANativeWindow_setBuffersGeometry
+static int g_SurfaceBufferHeight = 0;  // height passed to ANativeWindow_setBuffersGeometry
+static int g_PhysicalWidth = 0;        // actual EGL surface width after creation
+static int g_PhysicalHeight = 0;
 static struct android_app* g_App = NULL;
 static bool g_Initialized = false;
 static bool g_EglContextCreated = false;  // true once display/context/resources are up
@@ -417,9 +422,10 @@ void init(struct android_app* app) {
     // Get the first matching config
     EGLConfig egl_config;
     eglChooseConfig(g_EglDisplay, egl_attributes, &egl_config, 1, &num_configs);
-    EGLint egl_format;
-    eglGetConfigAttrib(g_EglDisplay, egl_config, EGL_NATIVE_VISUAL_ID, &egl_format);
-    ANativeWindow_setBuffersGeometry(g_App->window, width, height, egl_format);
+    eglGetConfigAttrib(g_EglDisplay, egl_config, EGL_NATIVE_VISUAL_ID, &g_EglFormat);
+    g_SurfaceBufferWidth = width;
+    g_SurfaceBufferHeight = height;
+    ANativeWindow_setBuffersGeometry(g_App->window, width, height, g_EglFormat);
 
     const EGLint egl_context_attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
     g_EglContext = eglCreateContext(g_EglDisplay, egl_config, EGL_NO_CONTEXT, egl_context_attributes);
@@ -451,6 +457,8 @@ void init(struct android_app* app) {
   int surface_width, surface_height;
   eglQuerySurface(g_EglDisplay, g_EglSurface, EGL_WIDTH, &surface_width);
   eglQuerySurface(g_EglDisplay, g_EglSurface, EGL_HEIGHT, &surface_height);
+  g_PhysicalWidth = surface_width;
+  g_PhysicalHeight = surface_height;
 
   // Setup Dear ImGui context
   IMGUI_CHECKVERSION();
@@ -537,6 +545,9 @@ static bool ensureSurface() {
 
   __android_log_print(ANDROID_LOG_INFO, g_LogTag, "%s", "ensureSurface: recreating EGL surface");
 
+  // Must reapply buffer geometry so the surface comes back at the same scaled size
+  ANativeWindow_setBuffersGeometry(g_App->window, g_SurfaceBufferWidth, g_SurfaceBufferHeight, g_EglFormat);
+
   g_EglSurface = eglCreateWindowSurface(g_EglDisplay, g_EglConfig, g_App->window, nullptr);
   if (g_EglSurface == EGL_NO_SURFACE) {
     __android_log_print(ANDROID_LOG_ERROR, g_LogTag, "ensureSurface: eglCreateWindowSurface failed: 0x%x", eglGetError());
@@ -550,7 +561,10 @@ static bool ensureSurface() {
     return false;
   }
 
-  __android_log_print(ANDROID_LOG_INFO, g_LogTag, "%s", "ensureSurface: EGL surface recreated successfully");
+  // Restore viewport to the physical dimensions
+  glViewport(0, 0, g_PhysicalWidth, g_PhysicalHeight);
+
+  __android_log_print(ANDROID_LOG_INFO, g_LogTag, "ensureSurface: EGL surface recreated, viewport %dx%d", g_PhysicalWidth, g_PhysicalHeight);
   return true;
 }
 
@@ -588,6 +602,11 @@ void shutdown() {
   g_EglContext = EGL_NO_CONTEXT;
   g_EglSurface = EGL_NO_SURFACE;
   g_EglConfig = nullptr;
+  g_EglFormat = 0;
+  g_SurfaceBufferWidth = 0;
+  g_SurfaceBufferHeight = 0;
+  g_PhysicalWidth = 0;
+  g_PhysicalHeight = 0;
   g_EglContextCreated = false;
   ANativeWindow_release(g_App->window);
 
