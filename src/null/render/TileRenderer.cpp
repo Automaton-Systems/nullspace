@@ -278,6 +278,29 @@ bool TileRenderer::CreateMapBuffer(MemoryArena& temp_arena, const char* filename
     }
   }
 
+  // Safe zone tile (171) is special: custom map tilesets typically don't include the safe zone graphic
+  // in that slot, so always override it with the safe zone from the default tileset.
+  {
+    int def_width = 0, def_height = 0;
+    u32* default_tilemap = (u32*)ImageLoad("graphics/tiles.bm2", &def_width, &def_height);
+    if (default_tilemap && def_width >= 304 && def_height >= 160) {
+      u32 data[16 * 16];
+      int tile_id = 170;  // tile 171, 0-indexed layer
+      int tile_y = tile_id / 19;  // 8
+      int tile_x = tile_id % 19;  // 18
+      int base_y = tile_y * 16 * 16 * 19;
+      int base_x = tile_x * 16;
+      for (int copy_y = 0; copy_y < 16; ++copy_y) {
+        for (int copy_x = 0; copy_x < 16; ++copy_x) {
+          u32 idx = base_y + base_x + copy_y * 16 * 19 + copy_x;
+          data[copy_y * 16 + copy_x] = default_tilemap[idx];
+        }
+      }
+      glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, tile_id, 16, 16, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      ImageFree(default_tilemap);
+    }
+  }
+
   glGenTextures(1, &door_texture);
   glBindTexture(GL_TEXTURE_2D, door_texture);
 
