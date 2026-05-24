@@ -825,6 +825,8 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 
   if (!self || self->ship == 8) return;
 
+  // Old energy digit display removed - now shown below health bar
+  /*
   int energy = (int)self->energy;
 
   int count = 0;
@@ -836,6 +838,7 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 
     energy /= 10;
   }
+  */
 
   RenderIndicators(ui_camera, renderer);
 
@@ -879,7 +882,8 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, Animation* animation, float y,
                                  float duration, TextColor color, bool percent = false) {
   SpriteRenderable& renderable = animation->GetFrame();
-  Vector2f position(ui_camera.surface_dim.x - renderable.dimensions.x, y - renderable.dimensions.y * 0.5f);
+  // Render on LEFT side below FPS (x=0) instead of right side
+  Vector2f position(0, y - renderable.dimensions.y * 0.5f);
 
   renderer.Draw(ui_camera, renderable, position, Layer::Gauges);
 
@@ -891,7 +895,8 @@ inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, An
     sprintf(duration_text, "%.1f", duration);
   }
 
-  renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(0, 4), Layer::Gauges, TextAlignment::Right);
+  // Text offset to the right of the icon (was offset left when on right side)
+  renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(renderable.dimensions.x + 2, 4), Layer::Gauges, TextAlignment::Left);
 }
 
 void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& renderer) {
@@ -931,9 +936,10 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
 
   RenderEnergyDisplay(ui_camera, renderer);
 
-  // Position icons below FPS to avoid radar overlap on small/scaled screens
-  float y_top = 50.0f;
-  float y = y_top;
+  // Position left item icons using same approach as weapon buttons
+  // Icons stack upward from bottom: 7 items × 25px = 175px total height
+  float item_stack_height = 175.0f;
+  float y = ui_camera.surface_dim.y - item_stack_height - 10.0f;  // 10px margin like buttons
 
   RenderItemIndicator(ui_camera, renderer, ship.bursts, 30, &y);
   RenderItemIndicator(ui_camera, renderer, ship.repels, 31, &y);
@@ -944,7 +950,9 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   RenderItemIndicator(ui_camera, renderer, ship.portals, 46, &y);
 
   float x = ui_camera.surface_dim.x - 26;
-  y = y_top;
+  // Position right-side icons same way: 6 items × 25px = 150px total height  
+  float right_stack_height = 150.0f;
+  y = ui_camera.surface_dim.y - right_stack_height - 10.0f;
   size_t gun_index = GetGunIconIndex();
   if (gun_index != 0xFFFFFFFF) {
     renderer.Draw(ui_camera, Graphics::icon_sprites[gun_index], Vector2f(x, y), Layer::Gauges);
@@ -1004,6 +1012,101 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
     renderer.Draw(ui_camera, Graphics::empty_icon_sprites[1], Vector2f(x + 22, y), Layer::Gauges);
   }
   y += 25.0f;
+  
+  // Weapon buttons: GUN and BOMB (round, grey border, blue fill, white text)
+  float button_size = 72.0f;
+  float button_radius = button_size / 2.0f;
+  float button_spacing = 12.0f;
+  float button_y = ui_camera.surface_dim.y - button_size - 10.0f;
+  float button_center_y = button_y + button_radius;
+  float gun_button_x = ui_camera.surface_dim.x - (button_size * 2) - button_spacing - 40.0f;  // Adjusted margin
+  float bomb_button_x = gun_button_x + button_size + button_spacing;
+  float gun_cx = gun_button_x + button_radius;
+  float bomb_cx = bomb_button_x + button_radius;
+  float border_thick = 3.0f;
+  float inner_r = button_radius - border_thick;
+
+  // GUN button - outer grey ring then blue fill
+  for (float sy = -button_radius; sy <= button_radius; sy += 1.0f) {
+    float hw = sqrtf(button_radius * button_radius - sy * sy);
+    SpriteRenderable scan = Graphics::GetColor(ColorType::Border1, Vector2f(hw * 2.0f, 1.0f));
+    renderer.Draw(ui_camera, scan, Vector2f(gun_cx - hw, button_center_y + sy), Layer::AfterChat);
+  }
+  for (float sy = -inner_r; sy <= inner_r; sy += 1.0f) {
+    float hw = sqrtf(inner_r * inner_r - sy * sy);
+    SpriteRenderable scan = Graphics::GetColor(ColorType::Background, Vector2f(hw * 2.0f, 1.0f));
+    renderer.Draw(ui_camera, scan, Vector2f(gun_cx - hw, button_center_y + sy), Layer::AfterChat);
+  }
+  renderer.DrawText(ui_camera, "GUN", TextColor::White,
+                   Vector2f(gun_cx, button_center_y - 5), Layer::AfterChat, TextAlignment::Center);
+
+  // BOMB button - outer grey ring then blue fill
+  for (float sy = -button_radius; sy <= button_radius; sy += 1.0f) {
+    float hw = sqrtf(button_radius * button_radius - sy * sy);
+    SpriteRenderable scan = Graphics::GetColor(ColorType::Border1, Vector2f(hw * 2.0f, 1.0f));
+    renderer.Draw(ui_camera, scan, Vector2f(bomb_cx - hw, button_center_y + sy), Layer::AfterChat);
+  }
+  for (float sy = -inner_r; sy <= inner_r; sy += 1.0f) {
+    float hw = sqrtf(inner_r * inner_r - sy * sy);
+    SpriteRenderable scan = Graphics::GetColor(ColorType::Background, Vector2f(hw * 2.0f, 1.0f));
+    renderer.Draw(ui_camera, scan, Vector2f(bomb_cx - hw, button_center_y + sy), Layer::AfterChat);
+  }
+  renderer.DrawText(ui_camera, "BOMB", TextColor::White,
+                   Vector2f(bomb_cx, button_center_y - 5), Layer::AfterChat, TextAlignment::Center);
+  
+  // Virtual D-Pad in bottom-left (next to ability icons, moved up more)
+  float dpad_size = 140.0f;  // Total d-pad diameter (increased from 80)
+  float dpad_radius = dpad_size / 2.0f;
+  float dpad_x = 50.0f + dpad_radius;  // 50px from left edge + radius (adjusted from 30px)
+  float dpad_y = button_y + button_size/2 - 40.0f;  // 40px higher than weapon buttons
+  
+  // Draw outer circle (base)
+  for (int i = 0; i < 32; ++i) {
+    float angle1 = (i / 32.0f) * 2.0f * 3.14159265f;
+    float angle2 = ((i + 1) / 32.0f) * 2.0f * 3.14159265f;
+    
+    float x1 = dpad_x + cosf(angle1) * dpad_radius;
+    float y1 = dpad_y + sinf(angle1) * dpad_radius;
+    float x2 = dpad_x + cosf(angle2) * dpad_radius;
+    float y2 = dpad_y + sinf(angle2) * dpad_radius;
+    
+    // Draw line segment (approximation of circle)
+    SpriteRenderable line = Graphics::GetColor(ColorType::Border1, Vector2f(2, 2));
+    renderer.Draw(ui_camera, line, Vector2f(x1, y1), Layer::AfterChat);
+  }
+  
+  // Draw 4 green directional arrows using Safe color (green from tiles)
+  float arrow_offset = 22.0f;  // Distance from center
+  float arrow_w = 14.0f;  // Arrow width
+  float arrow_h = 10.0f;  // Arrow height (point length)
+  
+  // UP arrow
+  for (float dy = 0; dy < arrow_h; dy += 1.0f) {
+    float width = arrow_w * (1.0f - dy / arrow_h);
+    SpriteRenderable seg = Graphics::GetColor(ColorType::Safe, Vector2f(width, 1.0f));
+    renderer.Draw(ui_camera, seg, Vector2f(dpad_x - width/2, dpad_y - arrow_offset - dy), Layer::AfterChat);
+  }
+  
+  // DOWN arrow  
+  for (float dy = 0; dy < arrow_h; dy += 1.0f) {
+    float width = arrow_w * (1.0f - dy / arrow_h);
+    SpriteRenderable seg = Graphics::GetColor(ColorType::Safe, Vector2f(width, 1.0f));
+    renderer.Draw(ui_camera, seg, Vector2f(dpad_x - width/2, dpad_y + arrow_offset + dy), Layer::AfterChat);
+  }
+  
+  // LEFT arrow
+  for (float dx = 0; dx < arrow_h; dx += 1.0f) {
+    float height = arrow_w * (1.0f - dx / arrow_h);
+    SpriteRenderable seg = Graphics::GetColor(ColorType::Safe, Vector2f(1.0f, height));
+    renderer.Draw(ui_camera, seg, Vector2f(dpad_x - arrow_offset - dx, dpad_y - height/2), Layer::AfterChat);
+  }
+  
+  // RIGHT arrow
+  for (float dx = 0; dx < arrow_h; dx += 1.0f) {
+    float height = arrow_w * (1.0f - dx / arrow_h);
+    SpriteRenderable seg = Graphics::GetColor(ColorType::Safe, Vector2f(1.0f, height));
+    renderer.Draw(ui_camera, seg, Vector2f(dpad_x + arrow_offset + dx, dpad_y - height/2), Layer::AfterChat);
+  }
 }
 
 void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& renderer) {
@@ -1017,14 +1120,14 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   Vector2f health_position(ui_camera.surface_dim.x * 0.5f - healthbar.dimensions.x * 0.5f, 0);
 
   SpriteRenderable top_display_full = Graphics::anim_health_high.frames[5];
-  top_display_full.dimensions = Vector2f(240, 2);
+  top_display_full.dimensions = Vector2f(160, 2);
 
   SpriteRenderable top_display = Graphics::anim_health_high.frames[0];
 
   float ship_energy_percent =
       (float)ship.energy / player_manager.connection.settings.ShipSettings[self->ship].MaximumEnergy;
 
-  top_display.dimensions = Vector2f(ship_energy_percent * 240, 2);
+  top_display.dimensions = Vector2f(ship_energy_percent * 160, 2);
 
   float energy_percent = self->energy / ship.energy;
   float view_width = energy_percent * top_display.dimensions.x;
@@ -1040,7 +1143,7 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   SpriteRenderable energy_display = health_animation.GetFrame();
   energy_display.dimensions = Vector2f(view_width, 6);
 
-  renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(240, 4), Layer::Gauges);
+  renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(160, 4), Layer::Gauges);
   renderer.Draw(ui_camera, top_display_full, health_center - Vector2f(0, 4), Layer::Gauges);
 
   renderer.Draw(ui_camera, top_display, health_center - Vector2f(top_display.dimensions.x, 4), Layer::Gauges);
@@ -1050,6 +1153,13 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   renderer.Draw(ui_camera, energy_display, health_center, Layer::Gauges);
 
   renderer.Draw(ui_camera, healthbar, health_position, Layer::Gauges);
+  
+  // Display ship energy as small text centered below the bar
+  char energy_text[16];
+  sprintf(energy_text, "%d", (int)ship.energy);
+  renderer.DrawText(ui_camera, energy_text, TextColor::Blue, 
+                    Vector2f(health_center.x, healthbar.dimensions.y + 2), 
+                    Layer::Gauges, TextAlignment::Center);
 }
 
 void ShipController::RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index,

@@ -55,7 +55,8 @@ void Radar::Update(Camera& ui_camera, short map_zoom, u16 team_freq, u16 spec_id
   s32 texture_max_y = texture_min_y + ivar8;
 
   ctx.radar_dim = Vector2f(dim, dim);
-  ctx.radar_position = ui_camera.surface_dim - Vector2f(dim, dim) - Vector2f(kRadarBorder, kRadarBorder);
+  // Move radar to top-right corner for mobile layout
+  ctx.radar_position = Vector2f(ui_camera.surface_dim.x - dim - kRadarBorder, kRadarBorder);
   ctx.min_uv = Vector2f(texture_min_x / (float)full_dim, texture_min_y / (float)full_dim);
   ctx.max_uv = Vector2f(texture_max_x / (float)full_dim, texture_max_y / (float)full_dim);
 

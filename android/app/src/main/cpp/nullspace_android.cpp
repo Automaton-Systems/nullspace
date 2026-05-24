@@ -34,7 +34,22 @@ static struct {
   float last_tap_y;
   
   int64_t touch_start_time;
+  float touch_start_x;
+  float touch_start_y;
   bool long_press_triggered;
+  
+  // Multi-touch support
+  int32_t flying_pointer_id = -1;  // -1 if no flying touch active
+  int32_t gun_pointer_id = -1;     // -1 if no gun button pressed
+  int32_t bomb_pointer_id = -1;    // -1 if no bomb button pressed
+  
+  // Track ability triggers to prevent repeat firing
+  bool abilities_triggered = false;
+  
+  // Virtual joystick
+  float joystick_x = 0;  // Current joystick displacement X (-1 to 1)
+  float joystick_y = 0;  // Current joystick displacement Y (-1 to 1)
+  bool joystick_active = false;
 } android_input;
 const int32_t DOUBLE_TAP_TIMEOUT = 300 * 1000000;
 const int32_t LONG_PRESS_TIMEOUT = 800 * 1000000; // 800ms for long press
@@ -538,8 +553,10 @@ static void handleAppCmd(struct android_app* app, int32_t appCmd) {
       shutdown();
       break;
     case APP_CMD_GAINED_FOCUS:
+      // Don't need to do anything - window lifecycle handles EGL
       break;
     case APP_CMD_LOST_FOCUS:
+      // Don't need to do anything - window lifecycle handles EGL
       break;
   }
 }
@@ -549,11 +566,15 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
     int screen_width = ANativeWindow_getWidth(app->window);
     int screen_height = ANativeWindow_getHeight(app->window);
 
-    float x = AMotionEvent_getX(inputEvent, 0);
-    float y = AMotionEvent_getY(inputEvent, 0);
     int action = AMotionEvent_getAction(inputEvent);
     unsigned int flags = action & AMOTION_EVENT_ACTION_MASK;
+    size_t pointer_index = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+    size_t pointer_count = AMotionEvent_getPointerCount(inputEvent);
 
+    // Use first pointer for primary touch (flying/menu/spectate)
+    float x = AMotionEvent_getX(inputEvent, 0);
+    float y = AMotionEvent_getY(inputEvent, 0);
+    
     float nx = (x / screen_width) - 0.5f;
     float ny = (y / screen_height) - 0.5f;
 
@@ -563,90 +584,298 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
       null::Player* self = game->player_manager.GetSelf();
 
       if (self) {
+        // Check ALL active pointers for weapon button presses (multi-touch support)
+        if (self->ship < 8 && (flags == AMOTION_EVENT_ACTION_MOVE || flags == AMOTION_EVENT_ACTION_POINTER_DOWN || flags == AMOTION_EVENT_ACTION_DOWN)) {
+          bool gun_pressed = false;
+          bool bomb_pressed = false;
+          
+          for (size_t i = 0; i < pointer_count; ++i) {
+            float px = AMotionEvent_getX(inputEvent, i);
+            float py = AMotionEvent_getY(inputEvent, i);
+            float logical_x = px * (null::g_nullspace.surface_width / (float)screen_width);
+            float logical_y = py * (null::g_nullspace.surface_height / (float)screen_height);
+            float logical_screen_width = (float)null::g_nullspace.surface_width;
+            float logical_screen_height = (float)null::g_nullspace.surface_height;
+            
+            // Weapon button dimensions (round buttons)
+            float button_size = 72.0f;
+            float button_radius = button_size / 2.0f;
+            float button_spacing = 12.0f;
+            float button_y = logical_screen_height - button_size - 10.0f;
+            float button_center_y = button_y + button_radius;
+            float gun_button_x = logical_screen_width - (button_size * 2) - button_spacing - 40.0f;  // Adjusted margin
+            float bomb_button_x = gun_button_x + button_size + button_spacing;
+            float gun_cx = gun_button_x + button_radius;
+            float bomb_cx = bomb_button_x + button_radius;
+
+            // Circular hit test for gun button
+            float gdx = logical_x - gun_cx;
+            float gdy = logical_y - button_center_y;
+            float bdx = logical_x - bomb_cx;
+            float bdy = logical_y - button_center_y;
+            if (gdx * gdx + gdy * gdy <= button_radius * button_radius * 1.5f) {
+              gun_pressed = true;
+            } else if (bdx * bdx + bdy * bdy <= button_radius * button_radius * 1.5f) {
+              bomb_pressed = true;
+            }
+            
+            // Check if this pointer is on ability icon (ONLY on DOWN events, not MOVE)
+            if ((flags == AMOTION_EVENT_ACTION_DOWN || flags == AMOTION_EVENT_ACTION_POINTER_DOWN) && !android_input.abilities_triggered) {
+              float item_stack_height = 175.0f;
+              float items_start_y = logical_screen_height - item_stack_height - 10.0f;
+              float item_width = 26.0f;
+              float item_height = 25.0f;
+              
+              if (logical_x >= 0 && logical_x <= item_width && logical_y >= items_start_y) {
+                int item_index = (int)((logical_y - items_start_y) / item_height);
+                if (item_index >= 0 && item_index < 7) {
+                  // Trigger ability once on DOWN
+                  null::InputAction action;
+                  switch (item_index) {
+                    case 0: action = null::InputAction::Burst; break;
+                    case 1: action = null::InputAction::Repel; break;
+                    case 2: action = null::InputAction::Decoy; break;
+                    case 3: action = null::InputAction::Thor; break;
+                    case 4: action = null::InputAction::Brick; break;
+                    case 5: action = null::InputAction::Rocket; break;
+                    case 6: action = null::InputAction::Portal; break;
+                    default: action = null::InputAction::Burst; break;
+                  }
+                  null::g_InputState.SetAction(action, true);
+                  android_input.abilities_triggered = true;
+                }
+              }
+            }
+          }
+          
+          // Set weapon actions based on what's pressed
+          null::g_InputState.SetAction(null::InputAction::Bullet, gun_pressed);
+          null::g_InputState.SetAction(null::InputAction::Bomb, bomb_pressed);
+        }
+        
         if (flags == AMOTION_EVENT_ACTION_DOWN) {
           android_input.touch_start_time = AMotionEvent_getEventTime(inputEvent);
+          android_input.touch_start_x = x;
+          android_input.touch_start_y = y;
           android_input.long_press_triggered = false;
+          // Weapon button handling moved to multi-touch section above
         } else if (flags == AMOTION_EVENT_ACTION_UP) {
           android_input.anchored = false;
+          android_input.joystick_active = false;
+          android_input.joystick_x = 0;
+          android_input.joystick_y = 0;
+          android_input.abilities_triggered = false;  // Reset ability trigger flag
+          
+          // Clear ship control inputs when touch is released
+          if (self->ship < 8) {
+            null::g_InputState.SetAction(null::InputAction::Forward, false);
+            null::g_InputState.SetAction(null::InputAction::Left, false);
+            null::g_InputState.SetAction(null::InputAction::Right, false);
+            null::g_InputState.SetAction(null::InputAction::Bullet, false);
+            null::g_InputState.SetAction(null::InputAction::Bomb, false);
+            // Clear ability actions (they were pulsed on tap)
+            null::g_InputState.SetAction(null::InputAction::Burst, false);
+            null::g_InputState.SetAction(null::InputAction::Repel, false);
+            null::g_InputState.SetAction(null::InputAction::Decoy, false);
+            null::g_InputState.SetAction(null::InputAction::Thor, false);
+            null::g_InputState.SetAction(null::InputAction::Brick, false);
+            null::g_InputState.SetAction(null::InputAction::Rocket, false);
+            null::g_InputState.SetAction(null::InputAction::Portal, false);
+          }
           
           int64_t touch_duration = AMotionEvent_getEventTime(inputEvent) - android_input.touch_start_time;
           
-          // Check for long press to open menu
-          if (touch_duration >= LONG_PRESS_TIMEOUT && !android_input.long_press_triggered) {
-            // Trigger ESC menu
-            null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
-            android_input.long_press_triggered = true;
+          // Calculate drag distance to distinguish tap from drag
+          float dx_tap = x - android_input.touch_start_x;
+          float dy_tap = y - android_input.touch_start_y;
+          bool is_tap = (dx_tap * dx_tap + dy_tap * dy_tap) < 400.0f;  // 20px threshold
+          
+          // Transform touch coordinates from physical to logical space for menu detection
+          float logical_x = x * (null::g_nullspace.surface_width / (float)screen_width);
+          float logical_y = y * (null::g_nullspace.surface_height / (float)screen_height);
+          
+          bool handled_menu_interaction = false;
+          
+          // If menu is open, handle button clicks first (use logical coordinates)
+          if (game->menu_open && is_tap) {
+            handled_menu_interaction = true;
+            
+            // Menu dimensions: 420x240, top at y=3 (in logical space)
+            float menu_width = 420.0f;
+            float menu_height = 240.0f;
+            float logical_screen_width = (float)null::g_nullspace.surface_width;
+            float menu_x = (logical_screen_width - menu_width) * 0.5f;
+            float menu_y = 3.0f;
+            
+            // Right column (ships) starts at x offset
+            float button_width = 190.0f;
+            float button_height = 16.0f;
+            float right_column_x = menu_x + button_width + 20.0f;
+            float ships_start_y = menu_y + 32.0f;
+            
+            // Check if tap is in right column (ships) - use logical coordinates
+            if (logical_x >= right_column_x && logical_x <= right_column_x + button_width &&
+                logical_y >= ships_start_y && logical_y <= ships_start_y + 9 * (button_height + 2.0f)) {
+              float relative_y = logical_y - ships_start_y;
+              int ship_index = (int)(relative_y / (button_height + 2.0f));
+              
+              if (ship_index >= 0 && ship_index <= 8) {
+                if (ship_index == 8) {
+                  null::g_InputState.OnCharacter('s');  // Spectator
+                } else {
+                  // Ships 0-7 map to keys '1'-'8'
+                  null::g_InputState.OnCharacter('1' + ship_index);
+                }
+              }
+            }
+            // Left column buttons don't do anything for now
+            // If click is anywhere else in menu, close it
+            else if (logical_x >= menu_x && logical_x <= menu_x + menu_width &&
+                     logical_y >= menu_y && logical_y <= menu_y + menu_height) {
+              // Click inside menu but not on a working button - do nothing (keep menu open)
+            } else {
+              // Click outside menu - close it
+              null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+            }
           } else {
             android_input.last_tap_time = AMotionEvent_getEventTime(inputEvent);
             android_input.last_tap_x = x;
             android_input.last_tap_y = y;
             
-            // If menu is open, handle ship selection by screen zones
-            if (game->menu_open) {
-              // Divide screen into 9 zones (3x3 grid) for ships 1-8 + spectator
-              int zone_x = (int)(x / (screen_width / 3.0f));
-              int zone_y = (int)(y / (screen_height / 3.0f));
-              int ship_zone = zone_y * 3 + zone_x;
-              
-              if (ship_zone >= 0 && ship_zone <= 8) {
-                if (ship_zone == 8) {
-                  // Bottom-right = Spectator (S key)
-                  null::g_InputState.OnCharacter('s');
-                } else {
-                  // Ships 1-8 (number keys 1-8)
-                  null::g_InputState.OnCharacter('1' + ship_zone);
+            // Check if tap is in top UI area (health bar, name, etc) - roughly first 80 pixels (in logical space)
+            bool is_top_ui = (logical_y < 80.0f) && is_tap;
+            
+            if (is_top_ui && touch_duration < LONG_PRESS_TIMEOUT) {
+              // Toggle menu when tapping top UI area
+              null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+              handled_menu_interaction = true;
+            }
+            // Ability buttons are handled via multi-touch above
+            // Tap-to-shoot disabled for now - was causing bullet to get stuck
+            // Can re-enable later with better implementation
+            /*
+            else if (self->ship < 8 && is_tap && touch_duration < LONG_PRESS_TIMEOUT && !handled_menu_interaction) {
+              // Quick tap while in ship = shoot guns (but not if we just did menu stuff)
+              null::g_InputState.SetAction(null::InputAction::Bullet, true);
+            }
+            */
+          }
+        } else {
+          // Handle drag/move input
+          if (self->ship == 8) {
+            // Spectator mode: drag to move camera
+            if (!android_input.anchored) {
+              android_input.world_x = self->position.x;
+              android_input.world_y = self->position.y;
+              android_input.nx = nx;
+              android_input.ny = ny;
+              android_input.anchored = true;
+            }
+
+            float offset_x = (android_input.nx - nx) * (game->ui_camera.surface_dim.x * (1.0f / 16.0f));
+            float offset_y = (android_input.ny - ny) * (game->ui_camera.surface_dim.y * (1.0f / 16.0f));
+
+            self->position.x = android_input.world_x + offset_x;
+            self->position.y = android_input.world_y + offset_y;
+
+            if (abs(offset_x) > 1.0f || abs(offset_y) > 1.0f) {
+              game->specview.spectate_id = null::kInvalidSpectateId;
+            }
+
+            int64_t eventTime = AMotionEvent_getEventTime(inputEvent);
+            if (eventTime - android_input.last_tap_time <= DOUBLE_TAP_TIMEOUT) {
+              float dx = x - android_input.last_tap_x;
+              float dy = y - android_input.last_tap_y;
+
+              if (dx * dx + dy * dy < DOUBLE_TAP_SLOP * DOUBLE_TAP_SLOP) {
+                null::Vector2f world_pos(self->position.x + nx * (game->ui_camera.surface_dim.x * (1.0f / 16.0f)),
+                                         self->position.y + ny * (game->ui_camera.surface_dim.y * (1.0f / 16.0f)));
+
+                // Find nearby player to spectate
+                null::Player* closest = nullptr;
+                float closest_dist = 10000.0f;
+
+                for (size_t i = 0; i < game->player_manager.player_count; ++i) {
+                  null::Player* player = game->player_manager.players + i;
+
+                  if (player->ship == 8) continue;
+
+                  float dist_sq = player->position.DistanceSq(world_pos);
+                  if (dist_sq < closest_dist) {
+                    closest_dist = dist_sq;
+                    closest = player;
+                  }
+                }
+
+                if (closest && closest_dist <= 4.0f * 4.0f) {
+                  game->specview.spectate_id = closest->id;
+                  game->specview.spectate_frequency = closest->frequency;
                 }
               }
             }
-          }
-        } else {
-          if (!android_input.anchored) {
-            android_input.world_x = self->position.x;
-            android_input.world_y = self->position.y;
-            android_input.nx = nx;
-            android_input.ny = ny;
-            android_input.anchored = true;
-          }
-
-          float offset_x = (android_input.nx - nx) * (game->ui_camera.surface_dim.x * (1.0f / 16.0f));
-          float offset_y = (android_input.ny - ny) * (game->ui_camera.surface_dim.y * (1.0f / 16.0f));
-
-          self->position.x = android_input.world_x + offset_x;
-          self->position.y = android_input.world_y + offset_y;
-
-          if (abs(offset_x) > 1.0f || abs(offset_y) > 1.0f) {
-            game->specview.spectate_id = null::kInvalidSpectateId;
-          }
-
-          int64_t eventTime = AMotionEvent_getEventTime(inputEvent);
-          if (eventTime - android_input.last_tap_time <= DOUBLE_TAP_TIMEOUT) {
-            float dx = x - android_input.last_tap_x;
-            float dy = y - android_input.last_tap_y;
-
-            if (dx * dx + dy * dy < DOUBLE_TAP_SLOP * DOUBLE_TAP_SLOP) {
-              null::Vector2f world_pos(self->position.x + nx * (game->ui_camera.surface_dim.x * (1.0f / 16.0f)),
-                                       self->position.y + ny * (game->ui_camera.surface_dim.y * (1.0f / 16.0f)));
-
-              // Find nearby player to spectate
-              null::Player* closest = nullptr;
-              float closest_dist = 10000.0f;
-
-              for (size_t i = 0; i < game->player_manager.player_count; ++i) {
-                null::Player* player = game->player_manager.players + i;
-
-                if (player->ship == 8) continue;
-
-                float dist_sq = player->position.DistanceSq(world_pos);
-                if (dist_sq < closest_dist) {
-                  closest_dist = dist_sq;
-                  closest = player;
+          } else {
+            // Ship mode: Virtual D-Pad in bottom-left for flying
+            float logical_x = x * (null::g_nullspace.surface_width / (float)screen_width);
+            float logical_y = y * (null::g_nullspace.surface_height / (float)screen_height);
+            float logical_screen_height = (float)null::g_nullspace.surface_height;
+            
+            // D-pad position: same as weapon buttons but on left side (bigger now: 140px)
+            float dpad_size = 140.0f;  // Increased from 80
+            float dpad_radius = dpad_size / 2.0f;
+            float dpad_center_x = 50.0f + dpad_radius;  // Adjusted: 50px from left + radius
+            float button_size = 72.0f;
+            float button_y = logical_screen_height - button_size - 10.0f;
+            float dpad_center_y = button_y + button_size / 2.0f - 40.0f;  // 40px higher than buttons
+            
+            // Check if touch is in d-pad area
+            float dx = logical_x - dpad_center_x;
+            float dy = logical_y - dpad_center_y;
+            float dist = sqrtf(dx * dx + dy * dy);
+            
+            if (dist < dpad_radius * 1.5f) {  // Generous touch area
+              android_input.joystick_active = (dist > 15.0f);  // Dead zone (increased from 10)
+              
+              if (android_input.joystick_active) {
+                // Calculate desired angle from touch direction relative to d-pad center
+                // Fix: Add 90 degrees to correct the rotation
+                float touch_angle = atan2f(dy, dx) + (3.14159265f / 2.0f);  // Add 90 degrees
+                float desired_orientation = touch_angle / (2.0f * 3.14159265f);  // 0-1 range
+                if (desired_orientation < 0) desired_orientation += 1.0f;
+                
+                // Calculate angle difference to current ship orientation
+                float angle_diff = desired_orientation - self->orientation;
+                // Normalize to shortest rotation path
+                if (angle_diff > 0.5f) angle_diff -= 1.0f;
+                if (angle_diff < -0.5f) angle_diff += 1.0f;
+                
+                // Set rotation to turn ship toward desired direction
+                const float kRotationThreshold = 0.02f;  // ~7 degrees (tighter than before)
+                if (angle_diff < -kRotationThreshold) {
+                  null::g_InputState.SetAction(null::InputAction::Left, true);
+                  null::g_InputState.SetAction(null::InputAction::Right, false);
+                } else if (angle_diff > kRotationThreshold) {
+                  null::g_InputState.SetAction(null::InputAction::Right, true);
+                  null::g_InputState.SetAction(null::InputAction::Left, false);
+                } else {
+                  // Close enough to desired direction - stop rotating
+                  null::g_InputState.SetAction(null::InputAction::Left, false);
+                  null::g_InputState.SetAction(null::InputAction::Right, false);
                 }
+                
+                // Always thrust forward when d-pad is pushed (even while rotating)
+                null::g_InputState.SetAction(null::InputAction::Forward, true);
+              } else {
+                // In dead zone - clear all
+                null::g_InputState.SetAction(null::InputAction::Forward, false);
+                null::g_InputState.SetAction(null::InputAction::Left, false);
+                null::g_InputState.SetAction(null::InputAction::Right, false);
               }
-
-              if (closest && closest_dist <= 4.0f * 4.0f) {
-                game->specview.spectate_id = closest->id;
-                game->specview.spectate_frequency = closest->frequency;
-              }
+            } else {
+              // Not in d-pad area - clear joystick and movement
+              android_input.joystick_active = false;
+              null::g_InputState.SetAction(null::InputAction::Forward, false);
+              null::g_InputState.SetAction(null::InputAction::Left, false);
+              null::g_InputState.SetAction(null::InputAction::Right, false);
             }
           }
         }

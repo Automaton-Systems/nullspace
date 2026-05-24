@@ -145,8 +145,9 @@ void SpectateView::Render(Camera& ui_camera, SpriteRenderer& renderer) {
   if (!self) return;
   if (self->ship != 8) return;
 
-  // Position icons below FPS to avoid radar overlap on small/scaled screens
-  float y = 50.0f;
+  // Position icon at bottom using same approach as weapon buttons
+  float icon_height = 25.0f;
+  float y = ui_camera.surface_dim.y - icon_height - 10.0f;
   float x = ui_camera.surface_dim.x - 26;
   size_t icon_index = (self->togglables & Status_XRadar) ? 36 : 37;
 

@@ -17,7 +17,7 @@ NotificationSystem::NotificationSystem() {
 }
 
 void NotificationSystem::Render(Camera& camera, SpriteRenderer& renderer) {
-  Vector2f position(camera.surface_dim.x * 0.2f, camera.surface_dim.y * 0.6f);
+  Vector2f position(0, 55.0f);  // Directly below FPS (FPS is at y=40)
 
   u32 tick = GetCurrentTick();
 

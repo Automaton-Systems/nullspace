@@ -20,6 +20,8 @@ const Vector2f kGridVertices[] = {
 
 const char kGridVertexShaderCode[] = NULL_SHADER_VERSION
     R"(
+precision highp float;
+
 in vec2 position;
 
 uniform mat4 mvp;
@@ -34,14 +36,14 @@ void main() {
 
 const char kGridFragmentShaderCode[] = NULL_SHADER_VERSION
     R"(
-precision mediump float;
-precision mediump int;)"
+precision highp float;
+precision highp int;)"
 
 // Don't define precision for these types since it doesn't work on older desktop opengl versions.
 #ifdef __ANDROID__
     R"(
-precision mediump sampler2DArray;
-precision mediump usampler2D;)"
+precision highp sampler2DArray;
+precision highp usampler2D;)"
 #endif
     R"(
 
