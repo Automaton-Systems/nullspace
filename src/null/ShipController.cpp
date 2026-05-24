@@ -1060,7 +1060,12 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
     SpriteRenderable scan = Graphics::GetColor(ColorType::Background, Vector2f(hw * 2.0f, 1.0f));
     renderer.Draw(ui_camera, scan, Vector2f(bomb_cx - hw, button_center_y + sy), Layer::AfterChat);
   }
-  renderer.DrawText(ui_camera, "BOMB", TextColor::White,
+  
+  // Button text changes based on mine mode toggle state
+  extern bool g_AndroidMineMode;
+  const char* bomb_button_text = g_AndroidMineMode ? "MINE" : "BOMB";
+  TextColor button_text_color = g_AndroidMineMode ? TextColor::Yellow : TextColor::White;
+  renderer.DrawText(ui_camera, bomb_button_text, button_text_color,
                    Vector2f(bomb_cx, button_center_y - 5), Layer::AfterChat, TextAlignment::Center);
   
   // Virtual D-Pad in bottom-left (next to ability icons, moved up more)
@@ -1115,6 +1120,28 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
     float height = arrow_w * (1.0f - dx / arrow_h);
     SpriteRenderable seg = Graphics::GetColor(ColorType::Safe, Vector2f(1.0f, height));
     renderer.Draw(ui_camera, seg, Vector2f(dpad_x + arrow_offset + dx, dpad_y - height/2), Layer::AfterChat);
+  }
+  
+  // Afterburner indicator - show when active
+  extern InputState g_InputState;
+  if (g_InputState.IsDown(InputAction::Afterburner)) {
+    // Draw "AB" text in bright green above d-pad
+    renderer.DrawText(ui_camera, "AB", TextColor::Green,
+                     Vector2f(dpad_x, dpad_y - dpad_radius - 20.0f), Layer::AfterChat, TextAlignment::Center);
+    
+    // Draw ring around d-pad to show it's active
+    for (int i = 0; i < 32; ++i) {
+      float angle1 = (i / 32.0f) * 2.0f * 3.14159265f;
+      float angle2 = ((i + 1) / 32.0f) * 2.0f * 3.14159265f;
+      
+      float x1 = dpad_x + cosf(angle1) * (dpad_radius + 3);
+      float y1 = dpad_y + sinf(angle1) * (dpad_radius + 3);
+      float x2 = dpad_x + cosf(angle2) * (dpad_radius + 3);
+      float y2 = dpad_y + sinf(angle2) * (dpad_radius + 3);
+      
+      SpriteRenderable line = Graphics::GetColor(ColorType::Safe, Vector2f(3, 3));
+      renderer.Draw(ui_camera, line, Vector2f(x1, y1), Layer::AfterChat);
+    }
   }
 #endif  // __ANDROID__
 }

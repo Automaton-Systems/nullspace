@@ -14,6 +14,8 @@
 #include <null/render/Image.h>
 
 #include <chrono>
+#include <cstdlib>
+#include <ctime>
 
 static EGLDisplay g_EglDisplay = EGL_NO_DISPLAY;
 static EGLSurface g_EglSurface = EGL_NO_SURFACE;
@@ -53,6 +55,9 @@ static struct {
   // Track ability triggers to prevent repeat firing
   bool abilities_triggered = false;
   
+  // Track mine mode toggle
+  bool mine_mode_active = false;
+  
   // Virtual joystick
   float joystick_x = 0;  // Current joystick displacement X (-1 to 1)
   float joystick_y = 0;  // Current joystick displacement Y (-1 to 1)
@@ -71,6 +76,9 @@ static void destroySurfaceOnly();
 static bool ensureSurface();
 
 namespace null {
+
+// Global mine mode state accessible from rendering code
+bool g_AndroidMineMode = false;
 
 GameSettings g_Settings;
 
@@ -165,7 +173,10 @@ struct nullspace {
 
     perm_global = &perm_arena;
 
-    strcpy(name, kPlayerName);
+    // Generate random 3-digit suffix for player name
+    srand(static_cast<unsigned>(time(nullptr)));
+    int random_suffix = rand() % 1000;
+    snprintf(name, sizeof(name), "%s %03d", kPlayerName, random_suffix);
     strcpy(password, kPlayerPassword);
 
     SetPlatform();
@@ -721,19 +732,77 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                     case 3: action = null::InputAction::Thor; break;
                     case 4: action = null::InputAction::Brick; break;
                     case 5: action = null::InputAction::Rocket; break;
-                    case 6: action = null::InputAction::Portal; break;
+                    case 6: {
+                      // Portal/Warp toggle - if portal is active, warp to it, otherwise drop portal
+                      if (game->ship_controller.ship.portal_time > 0.0f) {
+                        action = null::InputAction::Warp;
+                      } else {
+                        action = null::InputAction::Portal;
+                      }
+                    } break;
                     default: action = null::InputAction::Burst; break;
                   }
                   null::g_InputState.SetAction(action, true);
                   android_input.abilities_triggered = true;
                 }
               }
+              
+              // Check right-side togglable icons (gun, bomb, stealth, cloak, xradar, antiwarp)
+              float right_icon_x = logical_screen_width - 26.0f;
+              float right_start_y = logical_screen_height - 160.0f;
+              float right_icon_width = 26.0f;
+              float right_icon_height = 25.0f;
+              
+              if (logical_x >= right_icon_x && logical_x <= logical_screen_width && logical_y >= right_start_y) {
+                int right_index = (int)((logical_y - right_start_y) / right_icon_height);
+                // Index 0 = gun (multifire toggle), 1 = bomb (mine mode toggle), 2 = stealth, 3 = cloak, 4 = xradar, 5 = antiwarp
+                if (right_index == 0) {
+                  // Multifire toggle on gun icon
+                  if (null::g_InputState.action_callback) {
+                    null::g_InputState.action_callback(null::g_InputState.user, null::InputAction::Multifire);
+                  }
+                  android_input.abilities_triggered = true;
+                } else if (right_index == 1) {
+                  // Mine mode toggle on bomb icon
+                  android_input.mine_mode_active = !android_input.mine_mode_active;
+                  null::g_AndroidMineMode = android_input.mine_mode_active;
+                  // Play sound feedback
+                  if (android_input.mine_mode_active) {
+                    game->sound_system.Play(null::AudioType::Mine1);
+                  } else {
+                    game->sound_system.Play(null::AudioType::ToggleOff);
+                  }
+                  android_input.abilities_triggered = true;
+                } else if (right_index >= 2 && right_index <= 5) {
+                  null::InputAction action;
+                  switch (right_index) {
+                    case 2: action = null::InputAction::Stealth; break;
+                    case 3: action = null::InputAction::Cloak; break;
+                    case 4: action = null::InputAction::XRadar; break;
+                    case 5: action = null::InputAction::Antiwarp; break;
+                    default: action = null::InputAction::Stealth; break;
+                  }
+                  // Use action callback for togglables instead of SetAction
+                  if (null::g_InputState.action_callback) {
+                    null::g_InputState.action_callback(null::g_InputState.user, action);
+                  }
+                  android_input.abilities_triggered = true;
+                }
+              }
             }
           }
           
-          // Set weapon actions based on what's pressed
+          // Set weapon actions based on what's pressed and mine mode toggle
           null::g_InputState.SetAction(null::InputAction::Bullet, gun_pressed);
-          null::g_InputState.SetAction(null::InputAction::Bomb, bomb_pressed);
+          
+          // Bomb button respects mine mode toggle
+          if (bomb_pressed) {
+            null::g_InputState.SetAction(null::InputAction::Bomb, !android_input.mine_mode_active);
+            null::g_InputState.SetAction(null::InputAction::Mine, android_input.mine_mode_active);
+          } else {
+            null::g_InputState.SetAction(null::InputAction::Bomb, false);
+            null::g_InputState.SetAction(null::InputAction::Mine, false);
+          }
         }
         
         if (flags == AMOTION_EVENT_ACTION_DOWN) {
@@ -756,6 +825,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             null::g_InputState.SetAction(null::InputAction::Right, false);
             null::g_InputState.SetAction(null::InputAction::Bullet, false);
             null::g_InputState.SetAction(null::InputAction::Bomb, false);
+            null::g_InputState.SetAction(null::InputAction::Mine, false);
             // Clear ability actions (they were pulsed on tap)
             null::g_InputState.SetAction(null::InputAction::Burst, false);
             null::g_InputState.SetAction(null::InputAction::Repel, false);
@@ -783,42 +853,83 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
           if (game->menu_open && is_tap) {
             handled_menu_interaction = true;
             
-            // Menu dimensions: 420x240, top at y=3 (in logical space)
-            float menu_width = 420.0f;
-            float menu_height = 240.0f;
+            // Menu dimensions: 620x340, top at y=3 (in logical space)
+            float menu_width = 620.0f;
+            float menu_height = 340.0f;
             float logical_screen_width = (float)null::g_nullspace.surface_width;
             float menu_x = (logical_screen_width - menu_width) * 0.5f;
             float menu_y = 3.0f;
             
-            // Right column (ships) starts at x offset
-            float button_width = 190.0f;
-            float button_height = 16.0f;
-            float right_column_x = menu_x + button_width + 20.0f;
-            float ships_start_y = menu_y + 32.0f;
+            // Left column (Quit, Stat Box, Help)
+            float left_button_width = 140.0f;
+            float left_button_height = 35.0f;
+            float left_column_x = menu_x + 10.0f;
+            float left_start_y = menu_y + 20.0f;
             
-            // Check if tap is in right column (ships) - use logical coordinates
-            if (logical_x >= right_column_x && logical_x <= right_column_x + button_width &&
-                logical_y >= ships_start_y && logical_y <= ships_start_y + 9 * (button_height + 2.0f)) {
-              float relative_y = logical_y - ships_start_y;
-              int ship_index = (int)(relative_y / (button_height + 2.0f));
+            // Right side ship grid
+            float grid_start_x = menu_x + left_button_width + 40.0f;
+            float grid_start_y = menu_y + 40.0f;
+            float cell_width = 110.0f;
+            float cell_height = 70.0f;
+            float grid_spacing = 8.0f;
+            
+            bool handled_click = false;
+            
+            // Check left column buttons
+            if (logical_x >= left_column_x && logical_x <= left_column_x + left_button_width &&
+                logical_y >= left_start_y && logical_y <= left_start_y + 3 * (left_button_height + 8.0f)) {
+              float relative_y = logical_y - left_start_y;
+              int button_index = (int)(relative_y / (left_button_height + 8.0f));
               
-              if (ship_index >= 0 && ship_index <= 8) {
-                if (ship_index == 8) {
-                  null::g_InputState.OnCharacter('s');  // Spectator
-                } else {
-                  // Ships 0-7 map to keys '1'-'8'
-                  null::g_InputState.OnCharacter('1' + ship_index);
+              if (button_index == 0) {
+                // Quit
+                null::g_InputState.OnCharacter('q');
+                handled_click = true;
+              } else if (button_index == 1) {
+                // Stat Box - cycle view, keep menu open
+                null::g_InputState.action_callback(null::g_InputState.user, null::InputAction::StatBoxCycle);
+                handled_click = true;
+              } else if (button_index == 2) {
+                // Help - does nothing for now
+                game->menu_open = false;
+                handled_click = true;
+              }
+            }
+            
+            // Check ship grid (3x3 grid, 9 cells for 8 ships + spectator)
+            if (!handled_click && logical_x >= grid_start_x && logical_x <= grid_start_x + 3 * (cell_width + grid_spacing) &&
+                logical_y >= grid_start_y && logical_y <= grid_start_y + 3 * (cell_height + grid_spacing)) {
+              float relative_x = logical_x - grid_start_x;
+              float relative_y = logical_y - grid_start_y;
+              
+              int col = (int)(relative_x / (cell_width + grid_spacing));
+              int row = (int)(relative_y / (cell_height + grid_spacing));
+              
+              if (col >= 0 && col < 3 && row >= 0 && row < 3) {
+                int ship_index = row * 3 + col;
+                
+                if (ship_index >= 0 && ship_index <= 8) {
+                  if (ship_index == 8) {
+                    null::g_InputState.OnCharacter('s');  // Spectator
+                  } else {
+                    // Ships 0-7 map to keys '1'-'8'
+                    null::g_InputState.OnCharacter('1' + ship_index);
+                  }
+                  handled_click = true;
                 }
               }
             }
-            // Left column buttons don't do anything for now
-            // If click is anywhere else in menu, close it
-            else if (logical_x >= menu_x && logical_x <= menu_x + menu_width &&
-                     logical_y >= menu_y && logical_y <= menu_y + menu_height) {
-              // Click inside menu but not on a working button - do nothing (keep menu open)
-            } else {
-              // Click outside menu - close it
-              null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+            
+            // If click is anywhere else in menu but not handled, keep menu open
+            // If click outside menu, close it
+            if (!handled_click) {
+              if (logical_x >= menu_x && logical_x <= menu_x + menu_width &&
+                  logical_y >= menu_y && logical_y <= menu_y + menu_height) {
+                // Click inside menu but not on a working button - do nothing (keep menu open)
+              } else {
+                // Click outside menu - close it
+                null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+              }
             }
           } else {
             android_input.last_tap_time = AMotionEvent_getEventTime(inputEvent);
@@ -945,6 +1056,10 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                   null::g_InputState.SetAction(null::InputAction::Right, false);
                 }
                 
+                // Afterburner: activate when dragging beyond d-pad radius
+                bool afterburner_active = (dist > dpad_radius);
+                null::g_InputState.SetAction(null::InputAction::Afterburner, afterburner_active);
+                
                 // Always thrust forward when d-pad is pushed (even while rotating)
                 null::g_InputState.SetAction(null::InputAction::Forward, true);
               } else {
@@ -952,6 +1067,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                 null::g_InputState.SetAction(null::InputAction::Forward, false);
                 null::g_InputState.SetAction(null::InputAction::Left, false);
                 null::g_InputState.SetAction(null::InputAction::Right, false);
+                null::g_InputState.SetAction(null::InputAction::Afterburner, false);
               }
             } else {
               // Not in d-pad area - clear joystick and movement
@@ -959,6 +1075,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
               null::g_InputState.SetAction(null::InputAction::Forward, false);
               null::g_InputState.SetAction(null::InputAction::Left, false);
               null::g_InputState.SetAction(null::InputAction::Right, false);
+              null::g_InputState.SetAction(null::InputAction::Afterburner, false);
             }
           }
         }

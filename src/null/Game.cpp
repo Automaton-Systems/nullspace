@@ -391,6 +391,11 @@ bool Game::Update(const InputState& input, float dt) {
 
   // Cap player and spectator camera to playable area
   if (self) {
+    // Center spectator at map center if they're near origin (initial spawn)
+    if (self->ship == 8 && self->position.x < 32.0f && self->position.y < 32.0f) {
+      self->position = Vector2f(512.0f, 512.0f);
+    }
+    
     if (self->position.x < 0) self->position.x = 0;
     if (self->position.y < 0) self->position.y = 0;
     if (self->position.x >= 1024) self->position.x = 1023.9f;
