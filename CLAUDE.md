@@ -18,8 +18,8 @@ git submodule init && git submodule update
 
 # Copy resources (graphics and sound folders) to Android assets
 mkdir -p android/app/src/main/assets
-cp -r /path/to/nullspace-resources/graphics android/app/src/main/assets/
-cp -r /path/to/nullspace-resources/sound android/app/src/main/assets/
+cp -r /path/to/graphics android/app/src/main/assets/
+cp -r /path/to/sound android/app/src/main/assets/
 ```
 
 #### 2. Configure Android Project
