@@ -661,9 +661,15 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
     }
   }
 
+#ifdef __ANDROID__
+  if (notifications && received_initial_list) {
+    notifications->PushFormatted(TextColor::Green, "%s entered arena", player->name);
+  }
+#else
   if (chat_controller && received_initial_list) {
     chat_controller->AddMessage(ChatType::Arena, "%s entered arena", player->name);
   }
+#endif
 }
 
 void PlayerManager::OnPlayerLeave(u8* pkt, size_t size) {
@@ -689,9 +695,15 @@ void PlayerManager::RemovePlayer(Player* player) {
   DetachPlayer(*player);
   DetachAllChildren(*player);
 
+#ifdef __ANDROID__
+  if (notifications) {
+    notifications->PushFormatted(TextColor::Green, "%s left arena", player->name);
+  }
+#else
   if (chat_controller) {
     chat_controller->AddMessage(ChatType::Arena, "%s left arena", player->name);
   }
+#endif
 
   // Swap the last player in the list's lookup to point to their new index
   assert(index < 1024);
