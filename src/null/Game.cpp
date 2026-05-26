@@ -941,6 +941,11 @@ void Game::OnFlagClaim(u8* pkt, size_t size) {
     if (was_dropped && player->id == specview.GetPlayerId()) {
       player->flag_timer = connection.settings.FlagDropDelay;
       sound_system.Play(AudioType::Flag);
+    } else if (was_dropped && player->id != specview.GetPlayerId()) {
+      // Notify when OTHER players pick up the flag
+      Player* self = player_manager.GetSelf();
+      TextColor color = (self && self->frequency == player->frequency) ? TextColor::Green : TextColor::Red;
+      notifications.PushFormatted(color, "%s picked up the flag", player->name);
     }
   } else {
     flags[id].owner = player->frequency;
@@ -979,6 +984,13 @@ void Game::OnFlagDrop(u8* pkt, size_t size) {
   if (!player) return;
 
   player->flags = 0;
+
+  // Notify when OTHER players drop the flag
+  if (player->id != specview.GetPlayerId()) {
+    Player* self = player_manager.GetSelf();
+    TextColor color = (self && self->frequency == player->frequency) ? TextColor::Green : TextColor::Red;
+    notifications.PushFormatted(color, "%s dropped the flag", player->name);
+  }
 }
 
 void Game::OnFlagVictory(u8* pkt, size_t size) {
