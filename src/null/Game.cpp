@@ -436,7 +436,11 @@ bool Game::Update(const InputState& input, float dt) {
 
   u32 tick = GetCurrentTick();
 
-  if (connection.settings.CarryFlags) {
+  // Note: do NOT gate this loop on CarryFlags. Turf flag games (e.g. ASSS fg_turf)
+  // run with CarryFlags=0 but still require the client to send the 0x13 touch
+  // packet so the server can record ownership changes. The inner can_carry /
+  // GameFlag_Turf check below correctly handles both modes.
+  {
     // TODO: Spatial partition queries
     for (size_t i = 0; i < flag_count; ++i) {
       GameFlag* flag = flags + i;
@@ -448,7 +452,7 @@ bool Game::Update(const InputState& input, float dt) {
       Vector2f flag_max = flag->position + Vector2f(1, 1);
 
       s32 carry_count = connection.settings.CarryFlags - 1;
-      if (carry_count == 0) carry_count = 1024;
+      if (carry_count <= 0) carry_count = 1024;
 
       for (size_t j = 0; j < player_manager.player_count; ++j) {
         Player* player = player_manager.players + j;
