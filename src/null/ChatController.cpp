@@ -409,9 +409,20 @@ void ChatController::Render(Camera& camera, SpriteRenderer& renderer) {
     end = 0;
   }
 
+#ifdef __ANDROID__
+  u32 current_tick = GetCurrentTick();
+#endif
+
   for (size_t i = start; i > end; --i) {
     size_t index = (i - 1) % NULLSPACE_ARRAY_SIZE(entries);
     ChatEntry* entry = entries + index;
+
+#ifdef __ANDROID__
+    // Skip expired entries on Android
+    if (TICK_GT(current_tick, entry->end_tick)) {
+      continue;
+    }
+#endif
 
     u32 max_characters = (u32)((camera.surface_dim.x - radar_size - name_size) / kFontWidth);
 
@@ -715,6 +726,9 @@ ChatEntry* ChatController::PushEntry(const char* mesg, size_t size, ChatType typ
   entry->sender[0] = 0;
   entry->type = type;
   entry->sound = 0;
+#ifdef __ANDROID__
+  entry->end_tick = GetCurrentTick() + 1500;  // 15 seconds (1500 ticks * 10ms)
+#endif
 
   return entry;
 }

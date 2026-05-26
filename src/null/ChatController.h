@@ -34,6 +34,9 @@ struct ChatEntry {
   u8 sound;
   char sender[20];
   char message[520];
+#ifdef __ANDROID__
+  u32 end_tick;
+#endif
 };
 
 struct ChatCursor {
