@@ -20,7 +20,7 @@ struct NotificationSystem {
 
   GameNotification notifications[7];
 
-  void Render(Camera& camera, SpriteRenderer& renderer);
+  void Render(Camera& camera, SpriteRenderer& renderer, float statbox_bottom_y = 55.0f);
 
   // Refreshes the oldest notification and returns it so the message can be set.
   GameNotification* PushNotification(TextColor color);

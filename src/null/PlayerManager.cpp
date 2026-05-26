@@ -80,6 +80,11 @@ static void OnPlayerDeathPkt(void* user, u8* pkt, size_t size) {
   manager->OnPlayerDeath(pkt, size);
 }
 
+static void OnScoreUpdatePkt(void* user, u8* pkt, size_t size) {
+  PlayerManager* manager = (PlayerManager*)user;
+  manager->OnScoreUpdate(pkt, size);
+}
+
 static void OnFlagDropPkt(void* user, u8* pkt, size_t size) {
   PlayerManager* manager = (PlayerManager*)user;
   manager->OnFlagDrop(pkt, size);
@@ -156,6 +161,7 @@ PlayerManager::PlayerManager(MemoryArena& perm_arena, Connection& connection, Pa
   dispatcher.Register(ProtocolS2C::BatchedSmallPosition, OnBatchedSmallPositionPkt, this);
   dispatcher.Register(ProtocolS2C::BatchedLargePosition, OnBatchedLargePositionPkt, this);
   dispatcher.Register(ProtocolS2C::PlayerDeath, OnPlayerDeathPkt, this);
+  dispatcher.Register(ProtocolS2C::ScoreUpdate, OnScoreUpdatePkt, this);
   dispatcher.Register(ProtocolS2C::DropFlag, OnFlagDropPkt, this);
   dispatcher.Register(ProtocolS2C::SetCoordinates, OnSetCoordinatesPkt, this);
   dispatcher.Register(ProtocolS2C::CreateTurret, OnCreateTurretLinkPkt, this);
@@ -747,7 +753,11 @@ void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
 
   if (killer) {
     ++killer->wins;
-    // TODO: points
+    // Provisional client-side points; will be corrected when ScoreUpdate arrives from server.
+    // Skip self-kills and team-kills (server does not award points for these).
+    if (killer != killed && (!killed || killer->frequency != killed->frequency)) {
+      killer->kill_points += bounty;
+    }
   }
 
   if (killer && killer != killed) {
@@ -769,6 +779,28 @@ void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
 
     sprintf(notification->message, "%s(%d) killed by: %s", killed->name, killed->bounty, killer->name);
   }
+}
+
+void PlayerManager::OnScoreUpdate(u8* pkt, size_t size) {
+  // Packet 0x09: type(1) + player_id(2) + kill_points(4) + flag_points(4) + wins(2) + losses(2) = 15
+  if (size < 15) return;
+
+  NetworkBuffer buffer(pkt, size, size);
+
+  buffer.ReadU8();
+  u16 pid = buffer.ReadU16();
+  u32 kill_points = buffer.ReadU32();
+  u32 flag_points = buffer.ReadU32();
+  u16 wins = buffer.ReadU16();
+  u16 losses = buffer.ReadU16();
+
+  Player* player = GetPlayerById(pid);
+  if (!player) return;
+
+  player->kill_points = kill_points;
+  player->flag_points = flag_points;
+  player->wins = wins;
+  player->losses = losses;
 }
 
 void PlayerManager::Spawn(bool reset) {

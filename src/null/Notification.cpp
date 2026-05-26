@@ -16,9 +16,9 @@ NotificationSystem::NotificationSystem() {
   }
 }
 
-void NotificationSystem::Render(Camera& camera, SpriteRenderer& renderer) {
+void NotificationSystem::Render(Camera& camera, SpriteRenderer& renderer, float statbox_bottom_y) {
 #ifdef __ANDROID__
-  Vector2f position(0, 55.0f);
+  Vector2f position(0, statbox_bottom_y + 5.0f);
 #else
   Vector2f position(camera.surface_dim.x * 0.2f, camera.surface_dim.y * 0.6f);
 #endif

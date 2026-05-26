@@ -60,7 +60,11 @@ StatBox::StatBox(PlayerManager& player_manager, BannerPool& banners, PacketDispa
   dispatcher.Register(ProtocolS2C::PlayerDeath, OnPlayerDeath, this);
 
   sliding_view.top = 0;
+#ifdef __ANDROID__
+  sliding_view.size = 8;  // Match radar height on Android
+#else
   sliding_view.size = 20;
+#endif
 }
 
 void StatBox::TriggerRebuild() {
@@ -138,6 +142,20 @@ void StatBox::Render(Camera& camera, SpriteRenderer& renderer) {
 
   if (!me || view_type == StatViewType::None) return;
 
+#ifdef __ANDROID__
+  // Dynamically size the statbox to roughly match the radar's vertical extent,
+  // using the same screen-relative formula as Radar.cpp (surface_dim.x / 6).
+  s16 radar_dim = ((((u16)camera.surface_dim.x / 6) / 4) * 8) / 2;
+  // Reserve space for the header row and top/bottom borders, fit as many 12px rows as possible.
+  s32 dynamic_lines = (s32)((radar_dim - kHeaderHeight - 2.0f * kBorder) / 12.0f);
+  if (dynamic_lines < 4) dynamic_lines = 4;
+  if (dynamic_lines > 40) dynamic_lines = 40;
+  if ((s32)sliding_view.size != dynamic_lines) {
+    sliding_view.size = (size_t)dynamic_lines;
+    rebuild = true;
+  }
+#endif
+
   if (rebuild) {
     rebuild = false;
     UpdateView();
@@ -186,7 +204,7 @@ void StatBox::UpdateSlidingView() {
 }
 
 void StatBox::RecordNamesView(const Player& me) {
-  constexpr float kNamesWidth = 108.0f;
+  constexpr float kNamesWidth = 140.0f;
   float width = kNamesWidth;
 
   StatTextOutput* count_output = AddTextOutput(Vector2f(49, kBorder + 1), TextColor::Green, TextAlignment::Center);
@@ -203,6 +221,14 @@ void StatBox::RecordNamesView(const Player& me) {
 
     float y = kBorder + kHeaderHeight + 1.0f + i * 12.0f;
     RecordName(player, y, selected_index == index, player->frequency == me.frequency);
+  }
+
+  // Add overflow indicator if there are more players
+  if (sliding_view.end() < player_manager.player_count) {
+    float y = kBorder + kHeaderHeight + 1.0f + i * 12.0f;
+    StatTextOutput* overflow_output = AddTextOutput(Vector2f(kBorder + 1, y), TextColor::DarkRed, TextAlignment::Left);
+    sprintf(overflow_output->text, "+%zd more", player_manager.player_count - sliding_view.end());
+    i++;
   }
 
   view_dimensions = Vector2f(width, kHeaderHeight + 1.0f + i * 12.0f);
@@ -248,6 +274,14 @@ void StatBox::RecordPointsView(const Player& me) {
 
     StatTextOutput* points_output = AddTextOutput(Vector2f(width, y), color, TextAlignment::Right);
     sprintf(points_output->text, "%d", player->flag_points + player->kill_points);
+  }
+
+  // Add overflow indicator if there are more players
+  if (sliding_view.end() < player_manager.player_count) {
+    float y = kBorder + kHeaderHeight + 1.0f + i * 12.0f;
+    StatTextOutput* overflow_output = AddTextOutput(Vector2f(kBorder + 1, y), TextColor::DarkRed, TextAlignment::Left);
+    sprintf(overflow_output->text, "+%zd more", player_manager.player_count - sliding_view.end());
+    i++;
   }
 
   view_dimensions = Vector2f(width, kHeaderHeight + 1.0f + i * 12.0f);
@@ -347,6 +381,13 @@ void StatBox::RecordTeamSortView(const Player& me) {
     y += 12.0f;
   }
 
+  // Add overflow indicator if there are more players
+  if (sliding_view.end() < player_manager.player_count) {
+    StatTextOutput* overflow_output = AddTextOutput(Vector2f(kBorder + 1, y), TextColor::DarkRed, TextAlignment::Left);
+    sprintf(overflow_output->text, "+%zd more", player_manager.player_count - sliding_view.end());
+    y += 12.0f;
+  }
+
   view_dimensions = Vector2f(width, y - 3.0f);
 }
 
@@ -430,6 +471,14 @@ void StatBox::RecordFullView(const Player& me) {
 
     StatTextOutput* ave_output = AddTextOutput(Vector2f(width, y), color, TextAlignment::Right);
     sprintf(ave_output->text, "%.1f", ave);
+  }
+
+  // Add overflow indicator if there are more players
+  if (sliding_view.end() < player_manager.player_count) {
+    float y = kBorder + kHeaderHeight + 1.0f + i * 12.0f;
+    StatTextOutput* overflow_output = AddTextOutput(Vector2f(kBorder + 1, y), TextColor::DarkRed, TextAlignment::Left);
+    sprintf(overflow_output->text, "+%zd more", player_manager.player_count - sliding_view.end());
+    i++;
   }
 
   view_dimensions = Vector2f(width, kHeaderHeight + 1.0f + i * 12.0f);
@@ -588,7 +637,7 @@ void StatBox::RecordName(Player* player, float y, bool selected, bool same_freq)
   TextColor color = same_freq ? TextColor::Yellow : TextColor::White;
   StatTextOutput* output = AddTextOutput(Vector2f(kBorder + kSpectateWidth + 2.0f, y), color, TextAlignment::Left);
 
-  sprintf(output->text, "%.12s", player->name);
+  sprintf(output->text, "%.18s", player->name);
 }
 
 void StatBox::OnPlayerEnter(u8* pkt, size_t size) {

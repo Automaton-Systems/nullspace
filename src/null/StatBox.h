@@ -54,7 +54,11 @@ struct StatBox {
   PlayerManager& player_manager;
   BannerPool& banners;
 
+#ifdef __ANDROID__
+  StatViewType view_type = StatViewType::Points;
+#else
   StatViewType view_type = StatViewType::Names;
+#endif
   bool rebuild = true;
 
   size_t selected_index = -1;

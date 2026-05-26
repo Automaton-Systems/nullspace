@@ -125,6 +125,12 @@ static void OnFlagDropPkt(void* user, u8* pkt, size_t size) {
   game->OnFlagDrop(pkt, size);
 }
 
+static void OnFlagVictoryPkt(void* user, u8* pkt, size_t size) {
+  Game* game = (Game*)user;
+
+  game->OnFlagVictory(pkt, size);
+}
+
 static void OnPlayerIdPkt(void* user, u8* pkt, size_t size) {
   Game* game = (Game*)user;
 
@@ -278,6 +284,7 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
   ui_camera.projection = Orthographic(0, ui_camera.surface_dim.x, ui_camera.surface_dim.y, 0, -zmax, zmax);
   dispatcher.Register(ProtocolS2C::FlagPosition, OnFlagPositionPkt, this);
   dispatcher.Register(ProtocolS2C::FlagClaim, OnFlagClaimPkt, this);
+  dispatcher.Register(ProtocolS2C::FlagVictory, OnFlagVictoryPkt, this);
   dispatcher.Register(ProtocolS2C::PlayerId, OnPlayerIdPkt, this);
   dispatcher.Register(ProtocolS2C::ArenaSettings, OnArenaSettingsPkt, this);
   dispatcher.Register(ProtocolS2C::TeamAndShipChange, OnPlayerFreqAndShipChangePkt, this);
@@ -648,10 +655,7 @@ void Game::Render(float dt) {
 
   char fps_text[32];
   sprintf(fps_text, "FPS: %d", (int)(fps + 0.5f));
-#ifdef __ANDROID__
-  sprite_renderer.DrawText(ui_camera, fps_text, TextColor::Pink, Vector2f(0, 40), Layer::TopMost,
-                           TextAlignment::Left);
-#else
+#ifndef __ANDROID__
   sprite_renderer.DrawText(ui_camera, fps_text, TextColor::Pink, Vector2f(ui_camera.surface_dim.x, 24), Layer::TopMost,
                            TextAlignment::Right);
 #endif
@@ -711,9 +715,13 @@ void Game::RenderGame(float dt) {
     for (size_t i = 0; i < flag_count; ++i) {
       GameFlag* flag = flags + i;
 
-      if (flag->owner == specview.GetFrequency()) {
-        radar.AddTemporaryIndicator(flag->position, 0, Vector2f(2, 2), ColorType::RadarTeamFlag);
-      }
+      if (flag->id == 0xFFFF) continue;
+      if (!(flag->flags & GameFlag_Dropped)) continue;
+
+      ColorType color = (flag->owner == specview.GetFrequency()) ? ColorType::RadarTeamFlag
+                                                                  : ColorType::RadarEnemyFlag;
+
+      radar.AddTemporaryIndicator(flag->position, 0, Vector2f(2, 2), color);
     }
 
     if (render_radar) {
@@ -723,15 +731,15 @@ void Game::RenderGame(float dt) {
     }
 
     chat.Render(ui_camera, sprite_renderer);
-    notifications.Render(ui_camera, sprite_renderer);
-
-    if (menu_open) {
-      RenderMenu();
-    }
   }
 
   statbox.Render(ui_camera, sprite_renderer);
+  notifications.Render(ui_camera, sprite_renderer, 3.0f + statbox.view_dimensions.y + 3.0f);
   specview.Render(ui_camera, sprite_renderer);
+
+  if (menu_open) {
+    RenderMenu();
+  }
 
   // Single UI-space flush: HUD, radar, chat, ship controller, all UI sprites.
   sprite_renderer.Render(ui_camera);
@@ -967,6 +975,23 @@ void Game::OnFlagDrop(u8* pkt, size_t size) {
   if (!player) return;
 
   player->flags = 0;
+}
+
+void Game::OnFlagVictory(u8* pkt, size_t size) {
+  if (size < 7) return;
+
+  u16 freq = *(u16*)(pkt + 1);
+  u32 points = *(u32*)(pkt + 3);
+
+  Player* self = player_manager.GetSelf();
+  bool is_my_team = self && self->frequency == freq;
+
+  if (is_my_team) {
+    notifications.PushFormatted(TextColor::Green, "VICTORY! Your team won %d points!", points);
+    sound_system.Play(AudioType::Flag);
+  } else {
+    notifications.PushFormatted(TextColor::Yellow, "Freq %d won %d points.", freq, points);
+  }
 }
 
 void Game::OnTurfFlagUpdate(u8* pkt, size_t size) {

@@ -825,19 +825,34 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 
   if (!self || self->ship == 8) return;
 
-#ifndef __ANDROID__
+  // Render the big-sprite energy number. Desktop: right-aligned to screen edge (top-right).
+  // Android: positioned just to the right of the centered energy bar so it sits between
+  // the bar and the radar.
   int energy = (int)self->energy;
+
+#ifdef __ANDROID__
+  // The energy bar spans [center - kAndroidBarWidth, center + kAndroidBarWidth]
+  // (RenderEnergyDisplay draws two halves of width kBarWidth on either side of center).
+  constexpr float kAndroidBarWidth = 160.0f;  // Must match RenderEnergyDisplay
+  float bar_right_x = ui_camera.surface_dim.x * 0.5f + kAndroidBarWidth;
+  // Compute how many digits we need so we can right-anchor the existing render loop.
+  int digit_count = 1;
+  int tmp = energy;
+  while (tmp >= 10) { ++digit_count; tmp /= 10; }
+  float anchor_x = bar_right_x + 3.0f + digit_count * 16.0f;
+#else
+  float anchor_x = ui_camera.surface_dim.x;
+#endif
 
   int count = 0;
   while (energy > 0 || count == 0) {
     int digit = energy % 10;
     SpriteRenderable& renderable = Graphics::energyfont_sprites[digit];
 
-    renderer.Draw(ui_camera, renderable, Vector2f(ui_camera.surface_dim.x - (++count * 16), 0), Layer::Gauges);
+    renderer.Draw(ui_camera, renderable, Vector2f(anchor_x - (++count * 16), 0), Layer::Gauges);
 
     energy /= 10;
   }
-#endif
 
   RenderIndicators(ui_camera, renderer);
 
@@ -881,11 +896,8 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
 inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, Animation* animation, float y,
                                  float duration, TextColor color, bool percent = false) {
   SpriteRenderable& renderable = animation->GetFrame();
-#ifdef __ANDROID__
-  Vector2f position(0, y - renderable.dimensions.y * 0.5f);
-#else
+  // Right-anchored on both platforms; icon flush to right edge, duration text just to its left.
   Vector2f position(ui_camera.surface_dim.x - renderable.dimensions.x, y - renderable.dimensions.y * 0.5f);
-#endif
 
   renderer.Draw(ui_camera, renderable, position, Layer::Gauges);
 
@@ -897,11 +909,7 @@ inline void RenderTimedIndicator(Camera& ui_camera, SpriteRenderer& renderer, An
     sprintf(duration_text, "%.1f", duration);
   }
 
-#ifdef __ANDROID__
-  renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(renderable.dimensions.x + 2, 4), Layer::Gauges, TextAlignment::Left);
-#else
   renderer.DrawText(ui_camera, duration_text, color, position + Vector2f(0, 4), Layer::Gauges, TextAlignment::Right);
-#endif
 }
 
 void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& renderer) {
@@ -909,6 +917,40 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
 
   if (!self) return;
 
+#ifdef __ANDROID__
+  // Stack the timed indicators upward from above the topmost right-side icon
+  // (the right icon column - gun/bomb/stealth/etc - starts at surface_dim.y - 160).
+  // Reserve = 160 (top of right icons) + small gap.
+  constexpr float kRightIconsReserve = 170.0f;
+  constexpr float kIndicatorSpacing = 19.0f;  // 16px indicator + 3px padding
+  float anchor_y = ui_camera.surface_dim.y - kRightIconsReserve;
+  // Slot 1 closest to icons, increasing slots go upward.
+  const float kPortalIndicatorY = anchor_y - kIndicatorSpacing * 1;
+  const float kFlagIndicatorY   = anchor_y - kIndicatorSpacing * 2;
+  const float kSuperIndicatorY  = anchor_y - kIndicatorSpacing * 3;
+  const float kShieldIndicatorY = anchor_y - kIndicatorSpacing * 4;
+
+  if (ship.portal_time > 0) {
+    RenderTimedIndicator(ui_camera, renderer, &portal_animation, kPortalIndicatorY, ship.portal_time,
+                         TextColor::Yellow);
+  }
+
+  if (ship.super_time > 0.0f) {
+    RenderTimedIndicator(ui_camera, renderer, &super_animation, kSuperIndicatorY, ship.super_time, TextColor::Yellow);
+  }
+
+  if (ship.shield_time > 0.0f) {
+    float max_shield_time = player_manager.connection.settings.ShipSettings[self->ship].ShieldsTime / 100.0f;
+    float percent = ship.shield_time / max_shield_time;
+    RenderTimedIndicator(ui_camera, renderer, &shield_animation, kShieldIndicatorY, percent, TextColor::Yellow, true);
+  }
+
+  if (self->flag_timer > 0) {
+    flag_animation.sprite = &Graphics::anim_flag_indicator;
+    float time = self->flag_timer / 100.0f;
+    RenderTimedIndicator(ui_camera, renderer, &flag_animation, kFlagIndicatorY, time, TextColor::DarkRed);
+  }
+#else
   if (ship.portal_time > 0) {
     constexpr float kPortalIndicatorY = 133;
 
@@ -938,6 +980,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
     float time = self->flag_timer / 100.0f;
     RenderTimedIndicator(ui_camera, renderer, &flag_animation, kFlagIndicatorY, time, TextColor::DarkRed);
   }
+#endif
 
   RenderEnergyDisplay(ui_camera, renderer);
 
@@ -1195,14 +1238,6 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   renderer.Draw(ui_camera, energy_display, health_center, Layer::Gauges);
 
   renderer.Draw(ui_camera, healthbar, health_position, Layer::Gauges);
-
-#ifdef __ANDROID__
-  char energy_text[16];
-  sprintf(energy_text, "%d", (int)ship.energy);
-  renderer.DrawText(ui_camera, energy_text, TextColor::Blue,
-                    Vector2f(health_center.x, healthbar.dimensions.y + 2),
-                    Layer::Gauges, TextAlignment::Center);
-#endif
 }
 
 void ShipController::RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index,

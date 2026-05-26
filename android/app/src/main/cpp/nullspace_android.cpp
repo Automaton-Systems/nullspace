@@ -108,8 +108,8 @@ struct ServerInfo {
 
 ServerInfo kServers[] = {
     {"emulator", "10.0.2.2", 5000},
-    {"local", "192.168.7.168", 5000},
-    {"subgame", "192.168.7.168", 5002},
+    {"local", "192.168.7.161", 5000},
+    {"subgame", "192.168.7.161", 5002},
     {"SSCE Hyperspace", "162.248.95.143", 5005},
     {"SSCJ Devastation", "69.164.220.203", 7022},
     {"SSCJ MetalGear CTF", "69.164.220.203", 14000},

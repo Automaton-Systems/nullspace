@@ -105,6 +105,7 @@ struct PlayerManager {
   void OnPlayerEnter(u8* pkt, size_t size);
   void OnPlayerLeave(u8* pkt, size_t size);
   void OnPlayerDeath(u8* pkt, size_t size);
+  void OnScoreUpdate(u8* pkt, size_t size);
   void OnPlayerFreqAndShipChange(u8* pkt, size_t size);
   void OnPlayerFrequencyChange(u8* pkt, size_t size);
   void OnLargePositionPacket(u8* pkt, size_t size);
