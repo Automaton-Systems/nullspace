@@ -14,6 +14,7 @@
 #else
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
@@ -1018,10 +1019,28 @@ void Connection::SendDamage(size_t damage_count, Damage* damages) {
 }
 
 ConnectResult Connection::Connect(const char* ip, u16 port) {
-  inet_pton(AF_INET, ip, &this->remote_addr.addr);
-
-  this->remote_addr.port = htons(port);
+  // Use getaddrinfo to resolve hostname or IP address
+  struct addrinfo hints = {}, *result = nullptr;
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_protocol = IPPROTO_UDP;
+  
+  char port_str[16];
+  snprintf(port_str, sizeof(port_str), "%u", port);
+  
+  int gai_result = getaddrinfo(ip, port_str, &hints, &result);
+  if (gai_result != 0 || !result || result->ai_family != AF_INET) {
+    if (result) freeaddrinfo(result);
+    return ConnectResult::ErrorSocket;
+  }
+  
+  // Extract resolved address
+  struct sockaddr_in* addr_in = (struct sockaddr_in*)result->ai_addr;
+  this->remote_addr.addr = addr_in->sin_addr.s_addr;
+  this->remote_addr.port = addr_in->sin_port;
   this->remote_addr.family = AF_INET;
+  
+  freeaddrinfo(result);
 
   this->fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
