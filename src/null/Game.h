@@ -82,6 +82,9 @@ struct Game {
   bool render_radar = false;
   bool menu_open = false;
   bool menu_quit = false;
+#ifdef __ANDROID__
+  bool show_all_statboxes = false;
+#endif
   int mapzoom = 0;
   float jitter_time = 0.0f;
   u32 last_tick = 0;

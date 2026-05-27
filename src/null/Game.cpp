@@ -714,7 +714,14 @@ void Game::RenderGame(float dt) {
     // Using glBufferData (stream draw) in Render() avoids CPU-GPU sync stalls on mobile.
     sprite_renderer.Render(camera);
 
+#ifdef __ANDROID__
+    // Skip ship HUD rendering when showing all statboxes to avoid overlapping
+    if (!show_all_statboxes) {
+      ship_controller.Render(ui_camera, camera, sprite_renderer);
+    }
+#else
     ship_controller.Render(ui_camera, camera, sprite_renderer);
+#endif
 
     for (size_t i = 0; i < flag_count; ++i) {
       GameFlag* flag = flags + i;
@@ -737,8 +744,88 @@ void Game::RenderGame(float dt) {
     chat.Render(ui_camera, sprite_renderer);
   }
 
+#ifdef __ANDROID__
+  // Render multiple statboxes when requested
+  if (show_all_statboxes) {
+    StatViewType original_view = statbox.view_type;
+    
+    // Layout: POINTS on left (full height), Frequency top-right, Full below Frequency
+    float box_padding = 5.0f;
+    float start_y = 25.0f;  // Space for labels at top
+    float label_y = 3.0f;  // Labels at very top
+    float available_height = ui_camera.surface_dim.y - start_y - box_padding;
+    
+    // 1. POINTS - left side, full height
+    statbox.view_type = StatViewType::Points;
+    statbox.rebuild = true;
+    Vector2f points_offset(box_padding - 3, start_y - 3);
+    sprite_renderer.DrawText(ui_camera, "Points", TextColor::White,
+                            Vector2f(box_padding + 60, label_y), Layer::TopMost, TextAlignment::Center);
+    statbox.Render(ui_camera, sprite_renderer, points_offset, available_height);
+    
+    // 2. Frequency - top right (next to Points)
+    float right_x = box_padding + 180.0f;  // Start right column after Points box
+    statbox.view_type = StatViewType::Frequency;
+    statbox.rebuild = true;
+    Vector2f freq_offset(right_x - 3, start_y - 3);
+    sprite_renderer.DrawText(ui_camera, "Frequency", TextColor::White,
+                            Vector2f(right_x + 80, label_y), Layer::TopMost, TextAlignment::Center);
+    statbox.Render(ui_camera, sprite_renderer, freq_offset);
+    
+    // 3. Full - below Frequency on right side
+    float full_y = start_y + 120.0f;  // Below Frequency
+    float full_label_y = full_y - 22.0f;  // Position label above the box
+    float full_available_height = ui_camera.surface_dim.y - full_y - box_padding;
+    statbox.view_type = StatViewType::Full;
+    statbox.rebuild = true;
+    Vector2f full_offset(right_x - 3, full_y - 3);
+    sprite_renderer.DrawText(ui_camera, "Stats", TextColor::White,
+                            Vector2f(right_x + 80, full_label_y), Layer::TopMost, TextAlignment::Center);
+    statbox.Render(ui_camera, sprite_renderer, full_offset, full_available_height);
+    
+    statbox.view_type = original_view;
+    statbox.rebuild = true;
+  } else {
+    statbox.Render(ui_camera, sprite_renderer);
+  }
+#else
   statbox.Render(ui_camera, sprite_renderer);
+#endif
+
+#ifdef __ANDROID__
+  // Only render "Main Menu" button when not showing all statboxes
+  if (!show_all_statboxes) {
+    const float kMenuButtonWidth = 120.0f;
+    const float kMenuButtonHeight = 28.0f;  // Match healthbar height
+    const float kMenuButtonPadding = 3.0f;
+    
+    Vector2f button_pos(kMenuButtonPadding, kMenuButtonPadding);
+    Vector2f button_size(kMenuButtonWidth, kMenuButtonHeight);
+    Vector2f button_center = button_pos + button_size * 0.5f;
+    
+    // Draw button background (light grey)
+    SpriteRenderable button_bg = Graphics::GetColor(ColorType::Background, button_size);
+    sprite_renderer.Draw(ui_camera, button_bg, button_pos, Layer::TopMost);
+    
+    // Draw button border (dark grey)
+    Graphics::DrawBorder(sprite_renderer, ui_camera, button_center, button_size * 0.5f);
+    
+    // Draw button text (white to match menu) - vertically centered
+    sprite_renderer.DrawText(ui_camera, "Main Menu", TextColor::White,
+                            Vector2f(button_center.x, button_center.y - 4.0f),
+                            Layer::TopMost, TextAlignment::Center);
+    
+    // Calculate total UI top height for notifications positioning
+    float ui_top_height = kMenuButtonPadding + kMenuButtonHeight + kMenuButtonPadding;
+    notifications.Render(ui_camera, sprite_renderer, ui_top_height + 3.0f);
+  } else {
+    // When showing statboxes, notifications at top
+    notifications.Render(ui_camera, sprite_renderer, 3.0f);
+  }
+#else
   notifications.Render(ui_camera, sprite_renderer, 3.0f + statbox.view_dimensions.y + 3.0f);
+#endif
+
   specview.Render(ui_camera, sprite_renderer);
 
   if (menu_open) {

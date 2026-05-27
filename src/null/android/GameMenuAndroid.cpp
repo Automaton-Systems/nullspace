@@ -9,7 +9,7 @@
 namespace null {
 
 void Game::RenderMenuAndroid() {
-  const char* kLeftMenuText[] = {"Quit", "Stat Box", "Help"};
+  const char* kLeftMenuText[] = {"Quit", "Scoreboard", "Help"};
 
   const char* kRightMenuText[] = {"Warbird", "Javelin", "Spider",
                                   "Leviathan", "Terrier",

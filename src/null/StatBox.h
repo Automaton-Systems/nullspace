@@ -55,7 +55,7 @@ struct StatBox {
   BannerPool& banners;
 
 #ifdef __ANDROID__
-  StatViewType view_type = StatViewType::Points;
+  StatViewType view_type = StatViewType::None;
 #else
   StatViewType view_type = StatViewType::Names;
 #endif
@@ -80,7 +80,7 @@ struct StatBox {
 
   StatBox(PlayerManager& player_manager, BannerPool& banners, PacketDispatcher& dispatcher);
 
-  void Render(Camera& camera, SpriteRenderer& renderer);
+  void Render(Camera& camera, SpriteRenderer& renderer, Vector2f offset = Vector2f(0, 0), float max_height = 0.0f);
 
   void RecordNamesView(const Player& me);
   void RecordPointsView(const Player& me);

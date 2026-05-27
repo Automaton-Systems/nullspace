@@ -137,7 +137,7 @@ void StatBox::OnAction(InputAction action, bool menu) {
   }
 }
 
-void StatBox::Render(Camera& camera, SpriteRenderer& renderer) {
+void StatBox::Render(Camera& camera, SpriteRenderer& renderer, Vector2f offset, float max_height) {
   Player* me = player_manager.GetSelf();
 
   if (!me || view_type == StatViewType::None) return;
@@ -145,9 +145,9 @@ void StatBox::Render(Camera& camera, SpriteRenderer& renderer) {
 #ifdef __ANDROID__
   // Dynamically size the statbox to roughly match the radar's vertical extent,
   // using the same screen-relative formula as Radar.cpp (surface_dim.x / 6).
-  s16 radar_dim = ((((u16)camera.surface_dim.x / 6) / 4) * 8) / 2;
+  float target_height = max_height > 0.0f ? max_height : ((((u16)camera.surface_dim.x / 6) / 4) * 8) / 2;
   // Reserve space for the header row and top/bottom borders, fit as many 12px rows as possible.
-  s32 dynamic_lines = (s32)((radar_dim - kHeaderHeight - 2.0f * kBorder) / 12.0f);
+  s32 dynamic_lines = (s32)((target_height - kHeaderHeight - 2.0f * kBorder) / 12.0f);
   if (dynamic_lines < 4) dynamic_lines = 4;
   if (dynamic_lines > 40) dynamic_lines = 40;
   if ((s32)sliding_view.size != dynamic_lines) {
@@ -164,23 +164,23 @@ void StatBox::Render(Camera& camera, SpriteRenderer& renderer) {
   // Render background
   SpriteRenderable background = Graphics::GetColor(ColorType::Background, view_dimensions);
 
-  renderer.Draw(camera, background, Vector2f(3, 3), Layer::TopMost);
+  renderer.Draw(camera, background, Vector2f(3, 3) + offset, Layer::TopMost);
 
   for (size_t i = 0; i < renderable_count; ++i) {
     StatRenderableOutput* output = renderable_outputs + i;
     SpriteRenderable renderable = *output->renderable;
     renderable.dimensions = output->dimensions;
 
-    renderer.Draw(camera, renderable, output->position, Layer::TopMost);
+    renderer.Draw(camera, renderable, output->position + offset, Layer::TopMost);
   }
 
   for (size_t i = 0; i < text_count; ++i) {
     StatTextOutput* output = text_outputs + i;
 
-    renderer.DrawText(camera, output->text, output->color, output->position, Layer::TopMost, output->alignment);
+    renderer.DrawText(camera, output->text, output->color, output->position + offset, Layer::TopMost, output->alignment);
   }
 
-  Graphics::DrawBorder(renderer, camera, view_dimensions * 0.5f + Vector2f(kBorder, kBorder), view_dimensions * 0.5f);
+  Graphics::DrawBorder(renderer, camera, view_dimensions * 0.5f + Vector2f(kBorder, kBorder) + offset, view_dimensions * 0.5f);
 }
 
 void StatBox::UpdateSlidingView() {

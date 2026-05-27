@@ -108,8 +108,8 @@ struct ServerInfo {
 
 ServerInfo kServers[] = {
     {"emulator", "10.0.2.2", 5000},
-    {"local", "192.168.7.161", 5000},
-    {"subgame", "192.168.7.161", 5002},
+    {"local", "192.168.7.180", 5000},
+    {"subgame", "192.168.7.180", 5002},
     {"SSCE Hyperspace", "162.248.95.143", 5005},
     {"SSCJ Devastation", "69.164.220.203", 7022},
     {"SSCJ MetalGear CTF", "69.164.220.203", 14000},
@@ -849,8 +849,13 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
           
           bool handled_menu_interaction = false;
           
+          // If showing all statboxes, any tap closes them
+          if (game->show_all_statboxes && is_tap) {
+            game->show_all_statboxes = false;
+            handled_menu_interaction = true;
+          }
           // If menu is open, handle button clicks first (use logical coordinates)
-          if (game->menu_open && is_tap) {
+          else if (game->menu_open && is_tap) {
             handled_menu_interaction = true;
             
             // Menu dimensions: 620x340, top at y=3 (in logical space)
@@ -860,7 +865,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             float menu_x = (logical_screen_width - menu_width) * 0.5f;
             float menu_y = 3.0f;
             
-            // Left column (Quit, Stat Box, Help)
+            // Left column (Quit, Scoreboard, Help)
             float left_button_width = 140.0f;
             float left_button_height = 35.0f;
             float left_column_x = menu_x + 10.0f;
@@ -886,8 +891,9 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                 null::g_InputState.OnCharacter('q');
                 handled_click = true;
               } else if (button_index == 1) {
-                // Stat Box - cycle view, keep menu open
-                null::g_InputState.action_callback(null::g_InputState.user, null::InputAction::StatBoxCycle);
+                // Scoreboard - toggle multi-statbox display
+                game->show_all_statboxes = !game->show_all_statboxes;
+                game->menu_open = false;
                 handled_click = true;
               } else if (button_index == 2) {
                 // Help - does nothing for now
