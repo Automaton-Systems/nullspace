@@ -14,6 +14,7 @@
 #include <null/render/Image.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
 
@@ -30,6 +31,15 @@ static struct android_app* g_App = NULL;
 static bool g_Initialized = false;
 static bool g_EglContextCreated = false;  // true once display/context/resources are up
 static char g_LogTag[] = "nullspace";
+
+// Login screen background sprites
+static GLuint g_ShipTextureId = 0;
+static int g_ShipWidth = 0;
+static int g_ShipHeight = 0;
+static GLuint g_AsteroidTextureId = 0;
+static int g_AsteroidWidth = 0;
+static int g_AsteroidHeight = 0;
+static bool g_BackgroundLoadAttempted = false;
 
 static struct {
   float world_x;
@@ -108,8 +118,7 @@ struct ServerInfo {
 
 ServerInfo kServers[] = {
     {"emulator", "10.0.2.2", 5000},
-    {"local", "192.168.7.180", 5000},
-    {"subgame", "192.168.7.180", 5002},
+    {"local", "192.168.7.177", 5000},
     {"SSCE Hyperspace", "162.248.95.143", 5005},
     {"SSCJ Devastation", "69.164.220.203", 7022},
     {"SSCJ MetalGear CTF", "69.164.220.203", 14000},
@@ -173,10 +182,27 @@ struct nullspace {
 
     perm_global = &perm_arena;
 
-    // Generate random 3-digit suffix for player name
+    // Generate random username: First+Second+4digits
+    // First word — evocative space/combat words (mix of nouns + adjectives, all work as prefix)
+    static const char* first[] = {
+        "Void", "Nova", "Storm", "Shadow", "Frost", "Flame", "Thunder", "Plasma",
+        "Eclipse", "Meteor", "Nebula", "Ghost", "Viper", "Titan", "Phoenix",
+        "Raven", "Wolf", "Hawk", "Comet", "Pulsar", "Photon", "Zenith",
+        "Apex", "Vector", "Neutron", "Crimson", "Azure", "Iron", "Dark", "Solar"
+    };
+    // Second word — clear action words, all unambiguously verb-like
+    static const char* second[] = {
+        "Strike", "Surge", "Blast", "Rush", "Pierce", "Crash", "Dive", "Soar",
+        "Bolt", "Slash", "Burn", "Shock", "Dash", "Rip", "Tear", "Hunt",
+        "Forge", "Break", "Burst", "Flash", "Drift", "Glide", "Freeze", "Shift",
+        "Spark", "Pulse", "Fire", "Charge", "Smash", "Raze"
+    };
+    
     srand(static_cast<unsigned>(time(nullptr)));
-    int random_suffix = rand() % 1000;
-    snprintf(name, sizeof(name), "%s %03d", kPlayerName, random_suffix);
+    const char* word1 = first[rand() % (sizeof(first) / sizeof(first[0]))];
+    const char* word2 = second[rand() % (sizeof(second) / sizeof(second[0]))];
+    int random_number = rand() % 10000;
+    snprintf(name, sizeof(name), "%s%s%04d", word1, word2, random_number);
     strcpy(password, kPlayerPassword);
 
     SetPlatform();
@@ -227,115 +253,265 @@ struct nullspace {
 
     ImGuiIO& io = ImGui::GetIO();
 
-    static bool WantTextInputLast = false;
-    if (io.WantTextInput && !WantTextInputLast) {
-      ShowSoftKeyboardInput();
-    }
-
-    WantTextInputLast = io.WantTextInput;
-
     // Use physical dimensions for ImGui framebuffer scaling
     io.DisplayFramebufferScale.x = physical_width / io.DisplaySize.x;
     io.DisplayFramebufferScale.y = physical_height / io.DisplaySize.y;
 
-    if (ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Enter))) {
-      JoinZone(selected_zone_index);
-    }
+    // Dark background similar to loading screen
+    ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.05f, 0.95f);
+    ImGui::GetStyle().Colors[ImGuiCol_Button] = ImVec4(0.259f, 0.259f, 0.420f, 1.0f);  // Dark blue from palette
+    ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] = ImVec4(0.388f, 0.388f, 0.580f, 1.0f);  // Lighter blue
+    ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] = ImVec4(0.388f, 0.388f, 1.0f, 0.8f);  // Bright blue on click
+    ImGui::GetStyle().Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);  // White button text
 
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 212.0f * scale, 2), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(210 * scale, 50 * scale), ImGuiCond_Always);
-
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-    if (ImGui::Begin("Debug", 0, window_flags)) {
-      ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-      ImGui::End();
-    }
-
-    float profile_width = 250 * scale;
-    float profile_height = 140 * scale;
-
-    ImGui::SetNextWindowPos(
-        ImVec2(io.DisplaySize.x / 4.0f - profile_width / 2, io.DisplaySize.y / 2.0f - profile_height / 2),
-        ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(profile_width, profile_height), ImGuiCond_Always);
-
-    if (ImGui::Begin("Profile", 0, window_flags)) {
-      ImGui::Text("Name");
-      ImGui::PushItemWidth(-1);
-      ImGui::InputText("##ProfileName", name, NULLSPACE_ARRAY_SIZE(name));
-      ImGui::PopItemWidth();
-      ImGui::Text("");
-      ImGui::Text("Password");
-      ImGui::PushItemWidth(-1);
-      ImGui::InputText("##ProfilePassword", password, NULLSPACE_ARRAY_SIZE(password), ImGuiInputTextFlags_Password);
-      ImGui::PopItemWidth();
-      ImGui::End();
-    }
-
-    float zones_width = 300 * scale;
-    float zones_height = 230 * scale;
-
-    ImGui::SetNextWindowPos(
-        ImVec2(3.0f * io.DisplaySize.x / 4.0f - zones_width / 2.0f, io.DisplaySize.y / 2.0f - zones_height / 2),
-        ImGuiCond_Always);
-
-    ImGui::SetNextWindowSize(ImVec2(zones_width, zones_height), ImGuiCond_Always);
-
-    if (ImGui::Begin("Zones", 0, window_flags)) {
-      ImGui::Text("Players Ping Zone Name");
-      ImGui::Separator();
-
-      if (ImGui::BeginListBox("##ZoneList", ImVec2(-FLT_MIN, 0.0f))) {
-        for (size_t i = 0; i < NULLSPACE_ARRAY_SIZE(kServers); ++i) {
-          bool selected = selected_zone_index == i;
-          char output[1024];
-
-          // TODO: Get ping and player count
-          u32 ping = 0;
-          u32 player_count = 0;
-
-          sprintf(output, "%6d %5d %s", ping, player_count, kServers[i].name);
-          if (ImGui::Selectable(output, &selected, ImGuiSelectableFlags_AllowDoubleClick)) {
-            selected_zone_index = i;
-
-            if (ImGui::IsMouseDoubleClicked(0)) {
-              JoinZone(selected_zone_index);
+    // Full screen window
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(io.DisplaySize);
+    
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | 
+                                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                                     ImGuiWindowFlags_NoScrollbar;
+    
+    if (ImGui::Begin("LoginScreen", nullptr, window_flags)) {
+      float center_x = io.DisplaySize.x * 0.5f;
+      float center_y = io.DisplaySize.y * 0.5f;
+      
+      // Load background sprites on first render (after platform is set up)
+      if (!g_BackgroundLoadAttempted) {
+        g_BackgroundLoadAttempted = true;
+        __android_log_print(ANDROID_LOG_INFO, g_LogTag, "Loading background sprites...");
+        
+        // Load ships
+        unsigned char* ship_image = null::ImageLoad("graphics/ships.bm2", &g_ShipWidth, &g_ShipHeight);
+        if (ship_image) {
+          glGenTextures(1, &g_ShipTextureId);
+          glBindTexture(GL_TEXTURE_2D, g_ShipTextureId);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_ShipWidth, g_ShipHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, ship_image);
+          null::ImageFree(ship_image);
+          __android_log_print(ANDROID_LOG_INFO, g_LogTag, "Loaded ships: %dx%d", g_ShipWidth, g_ShipHeight);
+        }
+        
+        // Load asteroids (using over2 - large brown asteroid from map tiles)
+        unsigned char* asteroid_image = null::ImageLoad("graphics/over2.bm2", &g_AsteroidWidth, &g_AsteroidHeight);
+        if (asteroid_image) {
+          glGenTextures(1, &g_AsteroidTextureId);
+          glBindTexture(GL_TEXTURE_2D, g_AsteroidTextureId);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+          glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, g_AsteroidWidth, g_AsteroidHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, asteroid_image);
+          null::ImageFree(asteroid_image);
+          __android_log_print(ANDROID_LOG_INFO, g_LogTag, "Loaded asteroids: %dx%d", g_AsteroidWidth, g_AsteroidHeight);
+        }
+      }
+      
+      // Draw background sprites FIRST (below all UI elements)
+      // Ships first (furthest back), then asteroids, then UI on top
+      
+      // Draw asteroids scattered randomly across the screen
+      if (g_AsteroidTextureId != 0) {
+        // Generate random positions ONCE and store them
+        struct AsteroidPosition {
+          float x, y, scale;
+        };
+        static AsteroidPosition asteroid_positions[150];  // Very dense scatter
+        static bool positions_generated = false;
+        
+        if (!positions_generated) {
+          srand(time(NULL));
+          int count = 0;
+          int max_attempts = 800;  // Prevent infinite loop
+          
+          while (count < 150 && max_attempts > 0) {
+            max_attempts--;
+            
+            // Generate random position
+            float x = 50 + (rand() % (int)(io.DisplaySize.x - 100));
+            float y = 150 + (rand() % (int)(io.DisplaySize.y - 200));  // Below title
+            float scale = 1.2f + (rand() % 4) * 0.3f;
+            float size = 32.0f * scale;
+            
+            // Check for overlap with existing asteroids
+            bool overlaps = false;
+            float min_distance = size * 0.8f;  // Minimum distance between centers
+            
+            for (int j = 0; j < count; j++) {
+              float dx = x - asteroid_positions[j].x;
+              float dy = y - asteroid_positions[j].y;
+              float distance = sqrtf(dx * dx + dy * dy);
+              
+              if (distance < min_distance) {
+                overlaps = true;
+                break;
+              }
+            }
+            
+            // Only add if no overlap
+            if (!overlaps) {
+              asteroid_positions[count].x = x;
+              asteroid_positions[count].y = y;
+              asteroid_positions[count].scale = scale;
+              count++;
             }
           }
+          positions_generated = true;
         }
-
-        ImGui::EndListBox();
+        
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.6f);  // 60% opacity
+        
+        // over2.bm2 is 320x96 with 32x32 sprites = 10 columns x 3 rows = 30 frames
+        float sprite_size = 32.0f;
+        float uv_width = sprite_size / (float)g_AsteroidWidth;   // 32/320 = 0.1
+        float uv_height = sprite_size / (float)g_AsteroidHeight; // 32/96 = 0.333...
+        
+        // Animate: cycle through all 30 frames over 1.5 seconds
+        constexpr float kAsteroidDuration = 1.5f;
+        constexpr int kFrameCount = 30;  // 10 columns x 3 rows
+        constexpr int kColumns = 10;
+        
+        float time = ImGui::GetTime();
+        float anim_progress = fmodf(time, kAsteroidDuration) / kAsteroidDuration;  // 0-1
+        int frame_index = (int)(anim_progress * kFrameCount) % kFrameCount;
+        
+        // Calculate UV for current frame (frames go left-to-right, top-to-bottom)
+        int frame_col = frame_index % kColumns;
+        int frame_row = frame_index / kColumns;
+        float uv_x = frame_col * uv_width;
+        float uv_y = frame_row * uv_height;
+        ImVec2 uv0(uv_x, uv_y);
+        ImVec2 uv1(uv_x + uv_width, uv_y + uv_height);
+        
+        // Draw all asteroids at their static positions
+        for (int i = 0; i < 150; i++) {
+          float display_size = sprite_size * asteroid_positions[i].scale;
+          ImVec2 pos(asteroid_positions[i].x - display_size * 0.5f, asteroid_positions[i].y - display_size * 0.5f);
+          
+          ImGui::SetCursorPos(pos);
+          ImGui::Image((ImTextureID)(intptr_t)g_AsteroidTextureId, ImVec2(display_size, display_size), uv0, uv1);
+        }
+        ImGui::PopStyleVar();
       }
+      
+      // Draw ships in a centered row directly below the NULLORBIT title
+      if (g_ShipTextureId != 0) {
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.6f);  // 60% opacity
+        float ship_size = 36.0f;
+        float uv_width = ship_size / (float)g_ShipWidth;
+        float uv_height = ship_size / (float)g_ShipHeight;
+        
+        // Calculate rows per ship
+        int total_rows = g_ShipHeight / (int)ship_size;  // 32
+        int rows_per_ship = total_rows / 8;  // 4
+        
+        // Position ships in a centered horizontal row
+        float ship_display_size = ship_size * 3.5f;
+        float spacing = ship_display_size + 20.0f;  // Space between ships
+        float total_width = (8 * ship_display_size) + (7 * 20.0f);  // Total width of all ships
+        float start_x = (io.DisplaySize.x - total_width) * 0.5f;  // Center horizontally
+        float y_pos = 180.0f + (ship_display_size * 0.5f) + 30.0f;  // Below NULLORBIT title, moved down by half height + padding
+        
+        // Draw all 8 ships in order
+        for (int i = 0; i < 8; i++) {
+          float x = start_x + i * spacing;
+          ImVec2 pos(x, y_pos);
+          
+          // Calculate UV for this ship type
+          float uv_y_start = (i * rows_per_ship) * uv_height;
+          float uv_y_end = uv_y_start + uv_height;
+          ImVec2 uv0(0.0f, uv_y_start);
+          ImVec2 uv1(uv_width, uv_y_end);
+          
+          ImGui::SetCursorPos(pos);
+          ImGui::Image((ImTextureID)(intptr_t)g_ShipTextureId, ImVec2(ship_display_size, ship_display_size), uv0, uv1);
+        }
+        ImGui::PopStyleVar();
+      }
+      
 
-      float width = ImGui::GetWindowWidth();
-      float button_width = 60.0f * scale;
-
-      float center = width / 2.0f;
-
-      ImGui::Separator();
-      ImGui::Text("");
-      ImGui::SetCursorPosX(center - button_width - 5.0f);
-      if (ImGui::Button("Play", ImVec2(button_width, 0.0f))) {
+      
+      // NOW draw UI elements on top
+      // Title: NULLORBIT at top (bigger) - Subspace bright blue
+      ImGui::SetCursorPosY(60);
+      ImGui::SetWindowFontScale(5.0f);
+      float title_width = ImGui::CalcTextSize("NULLORBIT").x;
+      ImGui::SetCursorPosX(center_x - title_width * 0.5f);
+      ImGui::TextColored(ImVec4(0.388f, 0.388f, 1.0f, 1.0f), "NULLORBIT");
+      ImGui::SetWindowFontScale(1.0f);
+      
+      ImGui::Dummy(ImVec2(0, 80));
+      
+      // Layout: Username on left, Buttons spanning most of screen width
+      float left_start = 50;
+      float button_margin = 40;
+      float button_width = io.DisplaySize.x - (button_margin * 2);  // Almost full width
+      float button_height = 170;  // Slightly taller
+      
+      // Left side: Display username
+      ImGui::SetCursorPosX(left_start);
+      ImGui::SetWindowFontScale(1.5f);
+      ImGui::TextColored(ImVec4(0.937f, 0.937f, 1.0f, 1.0f), "Player:");  // Off-white
+      ImGui::SetWindowFontScale(1.0f);
+      
+      ImGui::SetCursorPosX(left_start);
+      ImGui::SetWindowFontScale(2.0f);
+      ImGui::TextColored(ImVec4(0.451f, 1.0f, 0.388f, 1.0f), "%s", name);  // Neon green from game
+      ImGui::SetWindowFontScale(1.0f);
+      
+      ImGui::Dummy(ImVec2(0, 80));
+      
+      // "Select an arena:" label
+      ImGui::SetCursorPosX(left_start);
+      ImGui::SetWindowFontScale(1.5f);
+      ImGui::TextColored(ImVec4(0.937f, 0.937f, 1.0f, 1.0f), "Select an arena:");  // Off-white
+      ImGui::SetWindowFontScale(1.0f);
+      
+      ImGui::Dummy(ImVec2(0, 50));
+      
+      // Trench Wars button
+      ImGui::SetCursorPosX(button_margin);
+      
+      ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+      
+      // Trench Wars button - text centered in button
+      ImGui::SetWindowFontScale(1.8f);
+      if (ImGui::Button("Trench Wars: Capture the Flag", ImVec2(button_width, button_height))) {
+        selected_zone_index = 1;  // "local" server
         JoinZone(selected_zone_index);
       }
-
-      ImGui::SameLine();
-      ImGui::SetCursorPosX(center + 5.0f);
-
-      if (ImGui::Button("Quit", ImVec2(button_width, 0.0f))) {
-        return false;
+      ImGui::SetWindowFontScale(1.0f);
+      
+      // Emulator button (only show in debug builds) - at bottom of screen
+      #ifdef NDEBUG
+        // Release build - check if running on emulator
+        bool show_emulator = false;
+      #else
+        // Debug build - always show
+        bool show_emulator = true;
+      #endif
+      
+      if (show_emulator) {
+        float emulator_button_y = io.DisplaySize.y - (button_height * 0.6f) - 30;
+        ImGui::SetCursorPos(ImVec2(button_margin, emulator_button_y));
+        ImGui::SetWindowFontScale(1.5f);
+        if (ImGui::Button("Emulator (Test)", ImVec2(button_width, button_height * 0.6f))) {
+          selected_zone_index = 0;  // "emulator" server
+          JoinZone(selected_zone_index);
+        }
+        ImGui::SetWindowFontScale(1.0f);
       }
+      
+      ImGui::PopStyleVar();
+      
       ImGui::End();
     }
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-    // Force mouse cursor back to arrow if enter was pressed while mouse was over text input.
-    if (screen == GameScreen::Playing) {
-      ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
-      ImGui_ImplAndroid_NewFrame();
-    }
 
     return true;
   }
@@ -514,6 +690,8 @@ void init(struct android_app* app) {
   ImFontConfig font_cfg;
   font_cfg.SizePixels = 22.0f * base_dpi_scale * 1.5f;  // 1.5x larger font
   io.Fonts->AddFontDefault(&font_cfg);
+  
+  // Note: Ship texture will be loaded lazily after platform is set up
   
   // Calculate logical dimensions for game rendering (with extra multiplier for larger UI)
   // The game will render to these logical dimensions, and OpenGL will scale to physical resolution
