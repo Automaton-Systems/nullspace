@@ -2059,7 +2059,10 @@ void ShipController::ResetShip() {
       Prize prize = (Prize)prize_id;
 
       if (prize == Prize::FullCharge || prize == Prize::EngineShutdown || prize == Prize::Shields ||
-          prize == Prize::Super || prize == Prize::Warp || prize == Prize::Brick) {
+          prize == Prize::Super || prize == Prize::Warp || prize == Prize::Brick ||
+          prize == Prize::Repel || prize == Prize::Burst || prize == Prize::Decoy ||
+          prize == Prize::Thor || prize == Prize::Rocket || prize == Prize::Portal ||
+          prize == Prize::Multiprize) {
         --i;
         continue;
       }
