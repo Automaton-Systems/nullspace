@@ -372,13 +372,22 @@ void PlayerManager::RenderPlayerName(Camera& camera, SpriteRenderer& renderer, P
 
     char display[48];
 
+    bool is_self = (player.id == player_id);
     bool display_ball = player.ball_carrier && !is_decoy;
 
     if (player.flags > 0) {
-      sprintf(display, "%s(%d:%d)[%d] %s", player.name, player.bounty, player.flags, player.ping * 10,
-              display_ball ? "(Ball)" : "");
+      if (is_self) {
+        sprintf(display, "%s(%d:%d) %s", player.name, player.bounty, player.flags, display_ball ? "(Ball)" : "");
+      } else {
+        sprintf(display, "%s(%d:%d)[%d] %s", player.name, player.bounty, player.flags, player.ping * 10,
+                display_ball ? "(Ball)" : "");
+      }
     } else {
-      sprintf(display, "%s(%d)[%d] %s", player.name, player.bounty, player.ping * 10, display_ball ? "(Ball)" : "");
+      if (is_self) {
+        sprintf(display, "%s(%d) %s", player.name, player.bounty, display_ball ? "(Ball)" : "");
+      } else {
+        sprintf(display, "%s(%d)[%d] %s", player.name, player.bounty, player.ping * 10, display_ball ? "(Ball)" : "");
+      }
     }
 
     TextColor color = TextColor::Blue;
