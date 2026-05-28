@@ -2051,6 +2051,14 @@ void ShipController::ResetShip() {
 
   u32 pristine_seed = player_manager.connection.security.prize_seed;
 
+#ifdef __ANDROID__
+  // NullOrbit: Fixed initial loadout for Android
+  // Give everyone exactly level 1 gun, level 1 bomb, stealth, and xradar
+  ship.guns = 1;
+  ship.bombs = 1;
+  ship.capability |= (ShipCapability_Stealth | ShipCapability_XRadar);
+  // No other upgrades - players collect them via greens during gameplay
+#else
   // Generate random weighted prizes
   if (player_manager.connection.prize_weight_total > 0) {
     int attempts = 0;
@@ -2070,6 +2078,7 @@ void ShipController::ResetShip() {
       ApplyPrize(self, prize_id, false);
     }
   }
+#endif
 
   // Restore the prize seed to maintain synchronization with other clients.
   // The GeneratePrizes called above would mutate the seed, so it should be restored.

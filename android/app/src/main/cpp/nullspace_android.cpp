@@ -925,6 +925,22 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                 }
               }
               
+              // Check portal timer touch (for warping when portal is active)
+              if (game->ship_controller.ship.portal_time > 0.0f) {
+                // Portal timer is right-anchored at y = screen_height - 170 - 19
+                float portal_timer_y = logical_screen_height - 189.0f;
+                float portal_timer_height = 16.0f;
+                float portal_timer_width = 50.0f;  // Icon + text width estimate
+                float portal_timer_x = logical_screen_width - portal_timer_width;
+                
+                if (logical_x >= portal_timer_x && logical_x <= logical_screen_width &&
+                    logical_y >= portal_timer_y && logical_y <= (portal_timer_y + portal_timer_height)) {
+                  // Tap on portal timer - warp to portal
+                  null::g_InputState.SetAction(null::InputAction::Warp, true);
+                  android_input.abilities_triggered = true;
+                }
+              }
+              
               // Check right-side togglable icons (gun, bomb, stealth, cloak, xradar, antiwarp)
               float right_icon_x = logical_screen_width - 26.0f;
               float right_start_y = logical_screen_height - 160.0f;
@@ -1001,6 +1017,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             null::g_InputState.SetAction(null::InputAction::Forward, false);
             null::g_InputState.SetAction(null::InputAction::Left, false);
             null::g_InputState.SetAction(null::InputAction::Right, false);
+            null::g_InputState.SetAction(null::InputAction::Afterburner, false);
             null::g_InputState.SetAction(null::InputAction::Bullet, false);
             null::g_InputState.SetAction(null::InputAction::Bomb, false);
             null::g_InputState.SetAction(null::InputAction::Mine, false);
@@ -1197,20 +1214,21 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             float logical_y = y * (null::g_nullspace.surface_height / (float)screen_height);
             float logical_screen_height = (float)null::g_nullspace.surface_height;
             
-            // D-pad position: same as weapon buttons but on left side (bigger now: 140px)
+            // D-pad position: same as weapon buttons but on left side
             float dpad_size = 140.0f;  // Increased from 80
             float dpad_radius = dpad_size / 2.0f;
             float dpad_center_x = 50.0f + dpad_radius;  // Adjusted: 50px from left + radius
             float button_size = 72.0f;
             float button_y = logical_screen_height - button_size - 10.0f;
-            float dpad_center_y = button_y + button_size / 2.0f - 40.0f;  // 40px higher than buttons
+            float dpad_center_y = button_y + button_size / 2.0f - 40.0f - (logical_screen_height * 0.05f);  // 40px + 5% screen height higher than buttons
             
-            // Check if touch is in d-pad area
+            // Check if touch is in d-pad area (generous extended zone for dragging outside)
             float dx = logical_x - dpad_center_x;
             float dy = logical_y - dpad_center_y;
             float dist = sqrtf(dx * dx + dy * dy);
             
-            if (dist < dpad_radius * 1.5f) {  // Generous touch area
+            // Allow dragging well outside the d-pad - up to 3x radius
+            if (dist < dpad_radius * 3.0f) {
               android_input.joystick_active = (dist > 15.0f);  // Dead zone (increased from 10)
               
               if (android_input.joystick_active) {
@@ -1240,7 +1258,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                   null::g_InputState.SetAction(null::InputAction::Right, false);
                 }
                 
-                // Afterburner: activate when dragging beyond d-pad radius
+                // Afterburner: activate when dragging beyond d-pad border
                 bool afterburner_active = (dist > dpad_radius);
                 null::g_InputState.SetAction(null::InputAction::Afterburner, afterburner_active);
                 
