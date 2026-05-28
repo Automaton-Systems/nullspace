@@ -279,7 +279,8 @@ Game::Game(MemoryArena& perm_arena, MemoryArena& temp_arena, WorkQueue& work_que
       specview(connection, statbox, soccer),
       ship_controller(player_manager, weapon_manager, dispatcher, notifications),
       lvz(perm_arena, temp_arena, connection.requester, sprite_renderer, dispatcher),
-      radar(player_manager) {
+      radar(player_manager),
+      onboarding(player_manager) {
   float zmax = (float)Layer::Count;
   ui_camera.projection = Orthographic(0, ui_camera.surface_dim.x, ui_camera.surface_dim.y, 0, -zmax, zmax);
   dispatcher.Register(ProtocolS2C::FlagPosition, OnFlagPositionPkt, this);
@@ -387,6 +388,11 @@ bool Game::Update(const InputState& input, float dt) {
 
     animated_tile_renderer.InitializeDoors(tile_renderer);
     connection.map.brick_manager = &brick_manager;
+    
+    // Show onboarding wizard (for testing, shows every time entering server)
+#ifdef __ANDROID__
+    onboarding.Show();
+#endif
   }
 
   // This must be updated after position update
@@ -811,7 +817,7 @@ void Game::RenderGame(float dt) {
     Graphics::DrawBorder(sprite_renderer, ui_camera, button_center, button_size * 0.5f);
     
     // Draw button text (white to match menu) - vertically centered
-    sprite_renderer.DrawText(ui_camera, "Main Menu", TextColor::White,
+    sprite_renderer.DrawText(ui_camera, "MENU", TextColor::White,
                             Vector2f(button_center.x, button_center.y - 4.0f),
                             Layer::TopMost, TextAlignment::Center);
     
@@ -831,6 +837,11 @@ void Game::RenderGame(float dt) {
   if (menu_open) {
     RenderMenu();
   }
+
+#ifdef __ANDROID__
+  // Render onboarding wizard (full screen overlay)
+  onboarding.Render(ui_camera, sprite_renderer);
+#endif
 
   // Single UI-space flush: HUD, radar, chat, ship controller, all UI sprites.
   sprite_renderer.Render(ui_camera);

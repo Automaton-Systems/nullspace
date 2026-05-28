@@ -8,6 +8,7 @@
 #include <null/LvzController.h>
 #include <null/Memory.h>
 #include <null/Notification.h>
+#include <null/OnboardingWizard.h>
 #include <null/PlayerManager.h>
 #include <null/Radar.h>
 #include <null/Settings.h>
@@ -78,6 +79,7 @@ struct Game {
   ShipController ship_controller;
   LvzController lvz;
   Radar radar;
+  OnboardingWizard onboarding;
   float fps;
   bool render_radar = false;
   bool menu_open = false;

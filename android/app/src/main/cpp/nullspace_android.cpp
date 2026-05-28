@@ -843,14 +843,19 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
     size_t pointer_index = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
     size_t pointer_count = AMotionEvent_getPointerCount(inputEvent);
 
+    // Check if onboarding wizard is active and handle tap
+    null::Game* game = null::g_nullspace.game;
+    if (game && game->onboarding.IsActive() && flags == AMOTION_EVENT_ACTION_DOWN) {
+      game->onboarding.OnTap();
+      return 1;  // Consume the event
+    }
+
     // Use first pointer for primary touch (flying/menu/spectate)
     float x = AMotionEvent_getX(inputEvent, 0);
     float y = AMotionEvent_getY(inputEvent, 0);
     
     float nx = (x / screen_width) - 0.5f;
     float ny = (y / screen_height) - 0.5f;
-
-    null::Game* game = null::g_nullspace.game;
 
     if (game) {
       null::Player* self = game->player_manager.GetSelf();
@@ -1091,7 +1096,8 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                 game->menu_open = false;
                 handled_click = true;
               } else if (button_index == 2) {
-                // Help - does nothing for now
+                // Help - show onboarding wizard
+                game->onboarding.Show();
                 game->menu_open = false;
                 handled_click = true;
               }

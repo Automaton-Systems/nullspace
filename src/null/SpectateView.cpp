@@ -159,6 +159,7 @@ void SpectateView::Render(Camera& ui_camera, SpriteRenderer& renderer) {
 
   u32 tick = GetCurrentTick();
 
+#ifndef __ANDROID__
   if (follow_player && TICK_DIFF(GetCurrentTick(), follow_player->last_extra_timestamp) < kExtraDataTimeout) {
     char rows[6][64];
 
@@ -186,6 +187,7 @@ void SpectateView::Render(Camera& ui_camera, SpriteRenderer& renderer) {
       renderer.DrawText(ui_camera, rows[i], TextColor::White, Vector2f(x, (float)i * 12), Layer::Gauges);
     }
   }
+#endif
 
   // Deviate from Continuum spectator view by showing dead player's respawn timer while spectating them.
   if (follow_player && follow_player->enter_delay > 0 &&
