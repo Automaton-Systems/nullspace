@@ -952,20 +952,20 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   }
 #else
   if (ship.portal_time > 0) {
-    constexpr float kPortalIndicatorY = 133;
+    constexpr float kPortalIndicatorY = 147;
 
     RenderTimedIndicator(ui_camera, renderer, &portal_animation, kPortalIndicatorY, ship.portal_time,
                          TextColor::Yellow);
   }
 
   if (ship.super_time > 0.0f) {
-    constexpr float kSuperIndicatorY = 101;
+    constexpr float kSuperIndicatorY = 131;
 
     RenderTimedIndicator(ui_camera, renderer, &super_animation, kSuperIndicatorY, ship.super_time, TextColor::Yellow);
   }
 
   if (ship.shield_time > 0.0f) {
-    constexpr float kShieldIndicatorY = 85;
+    constexpr float kShieldIndicatorY = 115;
 
     float max_shield_time = player_manager.connection.settings.ShipSettings[self->ship].ShieldsTime / 100.0f;
     float percent = ship.shield_time / max_shield_time;
@@ -974,7 +974,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   }
 
   if (self->flag_timer > 0) {
-    constexpr float kFlagIndicatorY = 117;
+    constexpr float kFlagIndicatorY = 131;
 
     flag_animation.sprite = &Graphics::anim_flag_indicator;
     float time = self->flag_timer / 100.0f;
@@ -2053,9 +2053,9 @@ void ShipController::ResetShip() {
 
 #ifdef __ANDROID__
   // NullOrbit: Fixed initial loadout for Android
-  // Give everyone exactly level 1 gun, level 1 bomb, and stealth
+  // Give everyone exactly level 1 gun and stealth; only give bomb if the ship allows it
   ship.guns = 1;
-  ship.bombs = 1;
+  if (ship_settings.MaxBombs > 0) ship.bombs = 1;
   ship.capability |= ShipCapability_Stealth;
   // No other upgrades - players collect them via greens during gameplay
 #else
