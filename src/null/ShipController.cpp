@@ -2053,10 +2053,10 @@ void ShipController::ResetShip() {
 
 #ifdef __ANDROID__
   // NullOrbit: Fixed initial loadout for Android
-  // Give everyone exactly level 1 gun, level 1 bomb, stealth, and xradar
+  // Give everyone exactly level 1 gun, level 1 bomb, and stealth
   ship.guns = 1;
   ship.bombs = 1;
-  ship.capability |= (ShipCapability_Stealth | ShipCapability_XRadar);
+  ship.capability |= ShipCapability_Stealth;
   // No other upgrades - players collect them via greens during gameplay
 #else
   // Generate random weighted prizes
