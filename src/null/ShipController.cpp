@@ -921,14 +921,14 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   // Stack the timed indicators upward from above the topmost right-side icon
   // (the right icon column - gun/bomb/stealth/etc - starts at surface_dim.y - 160).
   // Reserve = 160 (top of right icons) + small gap.
-  constexpr float kRightIconsReserve = 170.0f;
+  constexpr float kRightIconsReserve = 173.0f;
   constexpr float kIndicatorSpacing = 19.0f;  // 16px indicator + 3px padding
   float anchor_y = ui_camera.surface_dim.y - kRightIconsReserve;
-  // Slot 1 closest to icons, increasing slots go upward.
-  const float kPortalIndicatorY = anchor_y - kIndicatorSpacing * 1;
-  const float kFlagIndicatorY   = anchor_y - kIndicatorSpacing * 2;
-  const float kSuperIndicatorY  = anchor_y - kIndicatorSpacing * 3;
-  const float kShieldIndicatorY = anchor_y - kIndicatorSpacing * 4;
+  // Portal is at anchor level (slot 0); flag and super share slot 1; shield at slot 2.
+  const float kPortalIndicatorY = anchor_y;
+  const float kFlagIndicatorY   = anchor_y - kIndicatorSpacing * 1;
+  const float kSuperIndicatorY  = anchor_y - kIndicatorSpacing * 1;  // same row as flag
+  const float kShieldIndicatorY = anchor_y - kIndicatorSpacing * 2;
 
   if (ship.portal_time > 0) {
     RenderTimedIndicator(ui_camera, renderer, &portal_animation, kPortalIndicatorY, ship.portal_time,
