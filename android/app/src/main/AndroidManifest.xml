@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.plushnode.nullspace">
+    package="com.systems.automaton.nullorbit">
 
     <application
-        android:label="NullSpace"
+        android:label="NULLORBIT"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:hasCode="true">
 
         <activity
-            android:name="com.plushnode.nullspace.MainActivity"
+            android:name="com.systems.automaton.nullorbit.MainActivity"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             android:configChanges="orientation|keyboardHidden|screenSize"
             android:screenOrientation="landscape"

@@ -12,6 +12,7 @@
 #include <null/Platform.h>
 #include <null/net/Connection.h>
 #include <null/render/Image.h>
+#include <null/android/AndroidSettings.h>
 
 #include <chrono>
 #include <cmath>
@@ -158,6 +159,31 @@ struct nullspace {
 
   size_t selected_zone_index = 0;
 
+  std::string GenerateRandomUsername() {
+    // First word — evocative space/combat words (mix of nouns + adjectives, all work as prefix)
+    static const char* first[] = {
+        "Void", "Nova", "Storm", "Shadow", "Frost", "Flame", "Thunder", "Plasma",
+        "Eclipse", "Meteor", "Nebula", "Ghost", "Viper", "Titan", "Phoenix",
+        "Raven", "Wolf", "Hawk", "Comet", "Pulsar", "Photon", "Zenith",
+        "Apex", "Vector", "Neutron", "Crimson", "Azure", "Iron", "Dark", "Solar"
+    };
+    // Second word — clear action words, all unambiguously verb-like
+    static const char* second[] = {
+        "Strike", "Surge", "Blast", "Rush", "Pierce", "Crash", "Dive", "Soar",
+        "Bolt", "Slash", "Burn", "Shock", "Dash", "Rip", "Tear", "Hunt",
+        "Forge", "Break", "Burst", "Flash", "Drift", "Glide", "Freeze", "Shift",
+        "Spark", "Pulse", "Fire", "Charge", "Smash", "Raze"
+    };
+    
+    const char* word1 = first[rand() % (sizeof(first) / sizeof(first[0]))];
+    const char* word2 = second[rand() % (sizeof(second) / sizeof(second[0]))];
+    int random_number = rand() % 10000;
+    
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "%s%s%04d", word1, word2, random_number);
+    return std::string(buffer);
+  }
+
   bool Initialize() {
     constexpr size_t kPermanentSize = Megabytes(64);
     constexpr size_t kTransientSize = Megabytes(32);
@@ -182,27 +208,16 @@ struct nullspace {
 
     perm_global = &perm_arena;
 
-    // Generate random username: First+Second+4digits
-    // First word — evocative space/combat words (mix of nouns + adjectives, all work as prefix)
-    static const char* first[] = {
-        "Void", "Nova", "Storm", "Shadow", "Frost", "Flame", "Thunder", "Plasma",
-        "Eclipse", "Meteor", "Nebula", "Ghost", "Viper", "Titan", "Phoenix",
-        "Raven", "Wolf", "Hawk", "Comet", "Pulsar", "Photon", "Zenith",
-        "Apex", "Vector", "Neutron", "Crimson", "Azure", "Iron", "Dark", "Solar"
-    };
-    // Second word — clear action words, all unambiguously verb-like
-    static const char* second[] = {
-        "Strike", "Surge", "Blast", "Rush", "Pierce", "Crash", "Dive", "Soar",
-        "Bolt", "Slash", "Burn", "Shock", "Dash", "Rip", "Tear", "Hunt",
-        "Forge", "Break", "Burst", "Flash", "Drift", "Glide", "Freeze", "Shift",
-        "Spark", "Pulse", "Fire", "Charge", "Smash", "Raze"
-    };
-    
     srand(static_cast<unsigned>(time(nullptr)));
-    const char* word1 = first[rand() % (sizeof(first) / sizeof(first[0]))];
-    const char* word2 = second[rand() % (sizeof(second) / sizeof(second[0]))];
-    int random_number = rand() % 10000;
-    snprintf(name, sizeof(name), "%s%s%04d", word1, word2, random_number);
+    
+    // Load username from settings or generate new one
+    if (!g_AndroidSettings.username.empty()) {
+      snprintf(name, sizeof(name), "%s", g_AndroidSettings.username.c_str());
+    } else {
+      std::string generated = GenerateRandomUsername();
+      snprintf(name, sizeof(name), "%s", generated.c_str());
+      g_AndroidSettings.SetUsername(generated);
+    }
     strcpy(password, kPlayerPassword);
 
     SetPlatform();
@@ -451,7 +466,7 @@ struct nullspace {
       float button_width = io.DisplaySize.x - (button_margin * 2);  // Almost full width
       float button_height = 170;  // Slightly taller
       
-      // Left side: Display username
+      // Left side: Display username with regenerate button
       ImGui::SetCursorPosX(left_start);
       ImGui::SetWindowFontScale(1.5f);
       ImGui::TextColored(ImVec4(0.937f, 0.937f, 1.0f, 1.0f), "Player:");  // Off-white
@@ -460,6 +475,20 @@ struct nullspace {
       ImGui::SetCursorPosX(left_start);
       ImGui::SetWindowFontScale(2.0f);
       ImGui::TextColored(ImVec4(0.451f, 1.0f, 0.388f, 1.0f), "%s", name);  // Neon green from game
+      ImGui::SetWindowFontScale(1.0f);
+      
+      // Regenerate button next to username
+      ImGui::SameLine();
+      ImGui::SetWindowFontScale(1.2f);
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.3f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.5f, 1.0f));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.7f, 1.0f));
+      if (ImGui::Button("↻")) {
+        std::string new_name = GenerateRandomUsername();
+        snprintf(name, sizeof(name), "%s", new_name.c_str());
+        g_AndroidSettings.SetUsername(new_name);
+      }
+      ImGui::PopStyleColor(3);
       ImGui::SetWindowFontScale(1.0f);
       
       ImGui::Dummy(ImVec2(0, 80));
@@ -1296,6 +1325,12 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
 void android_main(struct android_app* app) {
   app->onAppCmd = handleAppCmd;
   app->onInputEvent = handleInputEvent;
+
+  // Initialize settings storage
+  std::string settings_path = std::string(app->activity->internalDataPath) + "/settings.txt";
+  null::g_AndroidSettings.file_path = settings_path;
+  null::g_AndroidSettings.Load();
+  __android_log_print(ANDROID_LOG_INFO, g_LogTag, "Settings initialized at: %s", settings_path.c_str());
 
   while (true) {
     int out_events;

@@ -8,6 +8,10 @@
 #include <null/render/Animation.h>
 #include <null/render/Graphics.h>
 //
+#ifdef __ANDROID__
+#include <null/android/AndroidSettings.h>
+#endif
+//
 #include <assert.h>
 #include <stdio.h>
 
@@ -389,9 +393,11 @@ bool Game::Update(const InputState& input, float dt) {
     animated_tile_renderer.InitializeDoors(tile_renderer);
     connection.map.brick_manager = &brick_manager;
     
-    // Show onboarding wizard (for testing, shows every time entering server)
+    // Show onboarding wizard once on first server entry
 #ifdef __ANDROID__
-    onboarding.Show();
+    if (!g_AndroidSettings.wizard_shown) {
+      onboarding.Show();
+    }
 #endif
   }
 

@@ -6,6 +6,10 @@
 #include <null/render/Graphics.h>
 #include <null/render/SpriteRenderer.h>
 
+#ifdef __ANDROID__
+#include <null/android/AndroidSettings.h>
+#endif
+
 namespace null {
 
 OnboardingWizard::OnboardingWizard(PlayerManager& player_manager)
@@ -24,6 +28,9 @@ void OnboardingWizard::Show() {
 
 void OnboardingWizard::Hide() {
   active = false;
+#ifdef __ANDROID__
+  g_AndroidSettings.SetWizardShown(true);
+#endif
 }
 
 bool OnboardingWizard::OnTap() {
