@@ -208,3 +208,175 @@ The nullspace app has multiple server configurations in `android/app/src/main/cp
 **When running in emulator:** Select the "emulator" zone to connect to ASSS running on your host machine.
 
 **Zone selection:** The app defaults to `kServerIndex = 0` (emulator zone). To change, modify the index in nullspace_android.cpp and rebuild.
+
+## Bot Development (Zero)
+
+### Bot Executable Location
+**CRITICAL:** Bot executable is at `~/GitProjects/zero/build/zero` (NOT `~/GitProjects/zero/zero`)
+- Must run from `~/GitProjects/zero/build` directory OR use full path
+- Config files must be accessible from working directory
+
+### Bot Configuration Format
+
+Bots require proper zone-specific configuration to work correctly. Example config:
+
+```ini
+[Login]
+Username = ZeroBot1
+Password = local
+Server = TrenchWars        # CRITICAL: triggers TrenchWars zone
+Encryption = Subspace
+
+[General]
+LogLevel = Error
+
+[TrenchWars]               # Zone-specific section
+RequestShip = 3
+Behavior = basing          # Team base play behavior
+
+[Servers]
+TrenchWars = 127.0.0.1:5000  # Or IP address for remote servers
+```
+
+**Critical Requirements:**
+- **Server name MUST be "TrenchWars"** to trigger TrenchWars zone loading
+- Behavior must be in **[TrenchWars]** section, not [General]
+- Zone detection is based on server connection name, not IP
+
+**Available TrenchWars Behaviors:**
+- **basing** - Team base play (cooperative, won't fight each other)
+- **solo** - Individual PvP (bots fight everyone)
+- **turret** - Terrier support
+- **team** - Team coordination
+
+### Spawning Multiple Bots
+
+Generate configs and spawn 6 bots:
+
+```bash
+cd ~/GitProjects/zero/build
+
+# Generate 6 bot configs
+for i in {1..6}; do
+  cat > generated/ZeroBot${i}.cfg << 'BOTEOF'
+[Login]
+Username = ZeroBot${i}
+Password = local
+Server = TrenchWars
+Encryption = Subspace
+
+[General]
+LogLevel = Error
+
+[TrenchWars]
+RequestShip = $((1 + RANDOM % 8))
+Behavior = basing
+
+[Servers]
+TrenchWars = 127.0.0.1:5000
+BOTEOF
+done
+
+# Kill existing bots
+pkill -f "zero generated"
+sleep 1
+
+# Spawn new bots
+for i in {1..6}; do
+  ./zero generated/ZeroBot${i}.cfg > /dev/null 2>&1 &
+  sleep 0.2
+done
+```
+
+### Connecting to Remote Servers
+
+**ISSUE:** Zero bot may fail to resolve hostnames in config
+- Bot reads config but doesn't connect, exits silently
+- Config parsing works but hostname lookup may fail
+
+**Solution:** Use IP address instead of hostname in the [Servers] section.
+
+Resolve hostname first: `getent hosts <hostname>` then use the IP.
+
+**DON'T hardcode IPs in source code** - always use config files.
+
+### Common Bot Configuration Mistakes
+- Using `Server = Local` loads Local zone (no basing behavior)
+- Putting `Behavior` in `[General]` is ignored, uses default
+- Using `Server = Subgame` loads wrong zone with different behaviors
+
+## Production Server Management
+
+### SSH Access
+Production server requires SSH key authentication. Store keys securely and never commit them to git.
+
+### Deployment Workflow
+
+Updating Zero Bot on production:
+
+```bash
+# SSH to production server (with appropriate key)
+ssh -i <path-to-key> <user>@<production-server>
+
+# Navigate to zero repository
+cd zero
+
+# Pull latest changes
+git pull
+
+# Rebuild
+cd build
+make clean
+make -j4
+
+# Restart orchestrator (manages bot lifecycle)
+# Orchestrator handles bot spawning and respawning automatically
+```
+
+**Server Directory Structure:**
+- `~/asss/` - ASSS server installation
+- `~/zero/` - Zero bot repository
+- `~/orchestrator.py` - Process manager for server and bots
+
+**Important Server Commands:**
+```bash
+# Check running processes
+pgrep -a -f "asss|orchestrator"
+
+# View server logs (check zone/log/ directory)
+tail -f asss/zone/log/<logfile>
+
+# Restart orchestrator if needed (manages everything)
+pkill -f orchestrator.py
+# Usually auto-restarts via systemd or supervisor
+```
+
+## Git Commit Guidelines
+
+### CRITICAL: Never Use Co-Authored-By
+
+**NEVER include Co-authored-by: lines in commit messages for this project.**
+
+This applies to:
+- All commits to nullspace repository
+- All commits to zero repository  
+- All commits to any related repositories
+
+The project maintainer explicitly does not want co-authorship attribution in the git history.
+
+### Proper Commit Format
+
+Good commit message:
+```
+Fix bot weapon loadout to match Android client
+
+Skip InitialBounty prize generation and set fixed minimal loadout.
+Prevents bots from spawning with level 2/3 guns.
+```
+
+Bad commit message (DO NOT USE):
+```
+Fix bot weapon loadout
+
+Co-authored-by: Anyone <email@example.com>
+```
