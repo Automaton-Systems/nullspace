@@ -1113,46 +1113,23 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             float menu_x = (logical_screen_width - menu_width) * 0.5f;
             float menu_y = 3.0f;
             
-            // Left column (Quit, Scoreboard, Help)
-            float left_button_width = 140.0f;
-            float left_button_height = 35.0f;
-            float left_column_x = menu_x + 10.0f;
-            float left_start_y = menu_y + 20.0f;
-            
-            // Right side ship grid
-            float grid_start_x = menu_x + left_button_width + 40.0f;
+            // Left side ship grid
+            float grid_start_x = menu_x + 10.0f;
             float grid_start_y = menu_y + 40.0f;
             float cell_width = 110.0f;
             float cell_height = 70.0f;
             float grid_spacing = 8.0f;
             
+            // Right column (Scoreboard, Help, Quit)
+            float right_button_width = 140.0f;
+            float right_button_height = 35.0f;
+            float right_column_x = menu_x + menu_width - right_button_width - 10.0f;
+            float right_start_y = menu_y + 20.0f;
+            
             bool handled_click = false;
             
-            // Check left column buttons
-            if (logical_x >= left_column_x && logical_x <= left_column_x + left_button_width &&
-                logical_y >= left_start_y && logical_y <= left_start_y + 3 * (left_button_height + 8.0f)) {
-              float relative_y = logical_y - left_start_y;
-              int button_index = (int)(relative_y / (left_button_height + 8.0f));
-              
-              if (button_index == 0) {
-                // Quit
-                null::g_InputState.OnCharacter('q');
-                handled_click = true;
-              } else if (button_index == 1) {
-                // Scoreboard - toggle multi-statbox display
-                game->show_all_statboxes = !game->show_all_statboxes;
-                game->menu_open = false;
-                handled_click = true;
-              } else if (button_index == 2) {
-                // Help - show onboarding wizard
-                game->onboarding.Show();
-                game->menu_open = false;
-                handled_click = true;
-              }
-            }
-            
             // Check ship grid (3x3 grid, 9 cells for 8 ships + spectator)
-            if (!handled_click && logical_x >= grid_start_x && logical_x <= grid_start_x + 3 * (cell_width + grid_spacing) &&
+            if (logical_x >= grid_start_x && logical_x <= grid_start_x + 3 * (cell_width + grid_spacing) &&
                 logical_y >= grid_start_y && logical_y <= grid_start_y + 3 * (cell_height + grid_spacing)) {
               float relative_x = logical_x - grid_start_x;
               float relative_y = logical_y - grid_start_y;
@@ -1172,6 +1149,29 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                   }
                   handled_click = true;
                 }
+              }
+            }
+            
+            // Check right column buttons
+            if (!handled_click && logical_x >= right_column_x && logical_x <= right_column_x + right_button_width &&
+                logical_y >= right_start_y && logical_y <= right_start_y + 3 * (right_button_height + 8.0f)) {
+              float relative_y = logical_y - right_start_y;
+              int button_index = (int)(relative_y / (right_button_height + 8.0f));
+              
+              if (button_index == 0) {
+                // Scoreboard - toggle multi-statbox display
+                game->show_all_statboxes = !game->show_all_statboxes;
+                game->menu_open = false;
+                handled_click = true;
+              } else if (button_index == 1) {
+                // Help - show onboarding wizard
+                game->onboarding.Show();
+                game->menu_open = false;
+                handled_click = true;
+              } else if (button_index == 2) {
+                // Quit
+                null::g_InputState.OnCharacter('q');
+                handled_click = true;
               }
             }
             

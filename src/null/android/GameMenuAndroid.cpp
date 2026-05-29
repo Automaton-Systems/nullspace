@@ -9,9 +9,9 @@
 namespace null {
 
 void Game::RenderMenuAndroid() {
-  const char* kLeftMenuText[] = {"Quit", "Scoreboard", "Help"};
+  const char* kRightMenuText[] = {"Scoreboard", "Help", "Quit"};
 
-  const char* kRightMenuText[] = {"Warbird", "Javelin", "Spider",
+  const char* kLeftMenuText[] = {"Warbird", "Javelin", "Spider",
                                   "Leviathan", "Terrier",
                                   "Weasel", "Lancaster", "Shark",
                                   "Spectator"};
@@ -30,26 +30,8 @@ void Game::RenderMenuAndroid() {
   sprite_renderer.DrawText(ui_camera, "-= Menu =-", TextColor::Green, Vector2f(topleft.x + half_dimensions.x, 4),
                            Layer::TopMost, TextAlignment::Center);
 
-  float y = 20.0f;
-  float button_width = 140.0f;
-  float button_height = 35.0f;
-  float column_spacing = 20.0f;
-
-  // Left column - simplified menu
-  for (size_t i = 0; i < NULLSPACE_ARRAY_SIZE(kLeftMenuText); ++i) {
-    Vector2f button_size(button_width, button_height);
-    Vector2f button_pos(topleft.x + 10, topleft.y + y);
-
-    Graphics::DrawBorder(sprite_renderer, ui_camera, button_pos + button_size * 0.5f, button_size * 0.5f);
-    sprite_renderer.DrawText(ui_camera, kLeftMenuText[i], TextColor::White,
-                             Vector2f(button_pos.x + button_size.x * 0.5f, button_pos.y + 10),
-                             Layer::TopMost, TextAlignment::Center);
-
-    y += button_height + 8.0f;
-  }
-
-  // Right side - ship selection grid with sprites
-  float grid_start_x = topleft.x + button_width + column_spacing + 20;
+  // Left side - ship selection grid with sprites
+  float grid_start_x = topleft.x + 10.0f;
   float grid_y = topleft.y + 40.0f;
   float cell_width = 110.0f;
   float cell_height = 70.0f;
@@ -60,7 +42,7 @@ void Game::RenderMenuAndroid() {
                            Vector2f(grid_start_x + total_grid_width * 0.5f, 20.0f),
                            Layer::TopMost, TextAlignment::Center);
 
-  for (size_t i = 0; i < NULLSPACE_ARRAY_SIZE(kRightMenuText); ++i) {
+  for (size_t i = 0; i < NULLSPACE_ARRAY_SIZE(kLeftMenuText); ++i) {
     size_t col = i % 3;
     size_t row = i / 3;
     
@@ -80,9 +62,27 @@ void Game::RenderMenuAndroid() {
     }
 
     // Draw ship name below sprite
-    sprite_renderer.DrawText(ui_camera, kRightMenuText[i], TextColor::White,
+    sprite_renderer.DrawText(ui_camera, kLeftMenuText[i], TextColor::White,
                              Vector2f(cell_center.x, cell_pos.y + 52.0f),
                              Layer::TopMost, TextAlignment::Center);
+  }
+
+  // Right column - simplified menu buttons
+  float button_width = 140.0f;
+  float button_height = 35.0f;
+  float right_column_x = topleft.x + dimensions.x - button_width - 10.0f;
+  float y = 20.0f;
+
+  for (size_t i = 0; i < NULLSPACE_ARRAY_SIZE(kRightMenuText); ++i) {
+    Vector2f button_size(button_width, button_height);
+    Vector2f button_pos(right_column_x, topleft.y + y);
+
+    Graphics::DrawBorder(sprite_renderer, ui_camera, button_pos + button_size * 0.5f, button_size * 0.5f);
+    sprite_renderer.DrawText(ui_camera, kRightMenuText[i], TextColor::White,
+                             Vector2f(button_pos.x + button_size.x * 0.5f, button_pos.y + 10),
+                             Layer::TopMost, TextAlignment::Center);
+
+    y += button_height + 8.0f;
   }
 
   sprite_renderer.Render(ui_camera);
