@@ -483,15 +483,13 @@ struct nullspace {
       // Regenerate button next to username
       ImGui::SameLine();
       ImGui::SetWindowFontScale(1.2f);
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.2f, 0.3f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.5f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.4f, 0.4f, 0.7f, 1.0f));
-      if (ImGui::Button("↻")) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.871f, 0.192f, 0.031f, 1.0f));  // Bright red #DE3108 from palette
+      if (ImGui::Button("RESET")) {
         std::string new_name = GenerateRandomUsername();
         snprintf(name, sizeof(name), "%s", new_name.c_str());
         g_AndroidSettings.SetUsername(new_name);
       }
-      ImGui::PopStyleColor(3);
+      ImGui::PopStyleColor(1);
       ImGui::SetWindowFontScale(1.0f);
       
       ImGui::Dummy(ImVec2(0, 160));
