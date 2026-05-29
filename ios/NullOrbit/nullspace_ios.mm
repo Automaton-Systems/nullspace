@@ -748,22 +748,19 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
     } else if (game->menu_open && is_tap) {
       float menu_w = 620.0f, menu_h = 340.0f;
       float menu_x = (lw - menu_w) * 0.5f, menu_y = 3.0f;
-      float lbw    = 140.0f, lbh = 35.0f;
-      float lcx    = menu_x + 10.0f, lsy = menu_y + 20.0f;
-      float gsx    = menu_x + lbw + 40.0f, gsy = menu_y + 40.0f;
+
+      // Left side - ship selection grid
+      float gsx = menu_x + 10.0f, gsy = menu_y + 40.0f;
       float cw = 110.0f, ch = 70.0f, gs = 8.0f;
+
+      // Right column - Scoreboard, Help, Quit
+      float rbw = 140.0f, rbh = 35.0f;
+      float rcx = menu_x + menu_w - rbw - 10.0f, rsy = menu_y + 20.0f;
+
       bool handled = false;
 
-      if (logical_x >= lcx && logical_x <= lcx + lbw &&
-          logical_y >= lsy && logical_y <= lsy + 3*(lbh+8.0f)) {
-        int bi = (int)((logical_y - lsy) / (lbh + 8.0f));
-        if      (bi == 0) { g_InputState.OnCharacter('q'); }
-        else if (bi == 1) { game->show_all_statboxes = !game->show_all_statboxes; game->menu_open = false; }
-        else if (bi == 2) { game->onboarding.Show(); game->menu_open = false; }
-        handled = true;
-      }
-      if (!handled &&
-          logical_x >= gsx && logical_x <= gsx + 3*(cw+gs) &&
+      // Check ship grid (left side)
+      if (logical_x >= gsx && logical_x <= gsx + 3*(cw+gs) &&
           logical_y >= gsy && logical_y <= gsy + 3*(ch+gs)) {
         int col = (int)((logical_x - gsx) / (cw+gs));
         int row = (int)((logical_y - gsy) / (ch+gs));
@@ -773,6 +770,16 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
           else if (si < 8)  g_InputState.OnCharacter('1' + si);
           handled = true;
         }
+      }
+      // Check right column buttons (Scoreboard, Help, Quit)
+      if (!handled &&
+          logical_x >= rcx && logical_x <= rcx + rbw &&
+          logical_y >= rsy && logical_y <= rsy + 3*(rbh+8.0f)) {
+        int bi = (int)((logical_y - rsy) / (rbh + 8.0f));
+        if      (bi == 0) { game->show_all_statboxes = !game->show_all_statboxes; game->menu_open = false; }
+        else if (bi == 1) { game->onboarding.Show(); game->menu_open = false; }
+        else if (bi == 2) { g_InputState.OnCharacter('q'); }
+        handled = true;
       }
       if (!handled) {
         if (!(logical_x>=menu_x && logical_x<=menu_x+menu_w &&
