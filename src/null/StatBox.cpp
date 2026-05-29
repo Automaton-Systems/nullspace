@@ -235,7 +235,7 @@ void StatBox::RecordNamesView(const Player& me) {
 }
 
 void StatBox::RecordPointsView(const Player& me) {
-  constexpr float kBaseWidth = 124;
+  constexpr float kBaseWidth = 136;
   float width = kBaseWidth + GetPointsWidth();
 
   StatTextOutput* count_output = AddTextOutput(Vector2f(49, kBorder + 1), TextColor::Green, TextAlignment::Center);

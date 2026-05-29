@@ -776,7 +776,7 @@ void Game::RenderGame(float dt) {
     statbox.Render(ui_camera, sprite_renderer, points_offset, available_height);
     
     // 2. Frequency - top right (next to Points)
-    float right_x = box_padding + 180.0f;  // Start right column after Points box
+    float right_x = box_padding + 192.0f;  // Start right column after Points box (10% wider)
     statbox.view_type = StatViewType::Frequency;
     statbox.rebuild = true;
     Vector2f freq_offset(right_x - 3, start_y - 3);
