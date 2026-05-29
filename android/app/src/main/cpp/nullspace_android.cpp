@@ -89,7 +89,7 @@ static bool ensureSurface();
 namespace null {
 
 // Global mine mode state accessible from rendering code
-bool g_AndroidMineMode = false;
+bool g_MobileMineMode = false;
 
 GameSettings g_Settings;
 
@@ -121,10 +121,6 @@ struct ServerInfo {
 ServerInfo kServers[] = {
     {"emulator", "10.0.2.2", 5000},
     {"Null Orbit", "api.null-orbit.com", 5000},
-    {"SSCE Hyperspace", "162.248.95.143", 5005},
-    {"SSCJ Devastation", "69.164.220.203", 7022},
-    {"SSCJ MetalGear CTF", "69.164.220.203", 14000},
-    {"SSCU Extreme Games", "208.118.63.35", 7900},
 };
 
 constexpr size_t kServerIndex = 0;
@@ -1016,7 +1012,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
                 } else if (right_index == 1) {
                   // Mine mode toggle on bomb icon
                   android_input.mine_mode_active = !android_input.mine_mode_active;
-                  null::g_AndroidMineMode = android_input.mine_mode_active;
+                  null::g_MobileMineMode = android_input.mine_mode_active;
                   // Play sound feedback
                   if (android_input.mine_mode_active) {
                     game->sound_system.Play(null::AudioType::Mine1);

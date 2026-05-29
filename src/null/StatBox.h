@@ -54,7 +54,7 @@ struct StatBox {
   PlayerManager& player_manager;
   BannerPool& banners;
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   StatViewType view_type = StatViewType::None;
 #else
   StatViewType view_type = StatViewType::Names;

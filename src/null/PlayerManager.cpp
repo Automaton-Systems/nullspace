@@ -676,7 +676,7 @@ void PlayerManager::OnPlayerEnter(u8* pkt, size_t size) {
     }
   }
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   if (notifications && received_initial_list) {
     notifications->PushFormatted(TextColor::Green, "%s entered arena", player->name);
   }
@@ -710,7 +710,7 @@ void PlayerManager::RemovePlayer(Player* player) {
   DetachPlayer(*player);
   DetachAllChildren(*player);
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   if (notifications) {
     notifications->PushFormatted(TextColor::Green, "%s left arena", player->name);
   }

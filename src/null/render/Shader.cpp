@@ -32,6 +32,8 @@ bool CreateProgram(GLuint vertexShader, GLuint fragmentShader, GLuint* programOu
 
   glAttachShader(program, vertexShader);
   glAttachShader(program, fragmentShader);
+  glBindAttribLocation(program, 0, "position");
+  glBindAttribLocation(program, 1, "uv");
   glLinkProgram(program);
 
   GLint success;

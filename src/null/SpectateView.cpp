@@ -145,7 +145,7 @@ void SpectateView::Render(Camera& ui_camera, SpriteRenderer& renderer) {
   if (!self) return;
   if (self->ship != 8) return;
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   float y = ui_camera.surface_dim.y - 25.0f - 10.0f;
 #else
   float y = (ui_camera.surface_dim.y * 0.57f) + 1.0f;
@@ -159,7 +159,7 @@ void SpectateView::Render(Camera& ui_camera, SpriteRenderer& renderer) {
 
   u32 tick = GetCurrentTick();
 
-#ifndef __ANDROID__
+#ifndef NULLSPACE_MOBILE
   if (follow_player && TICK_DIFF(GetCurrentTick(), follow_player->last_extra_timestamp) < kExtraDataTimeout) {
     char rows[6][64];
 

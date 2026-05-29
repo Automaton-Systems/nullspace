@@ -19,7 +19,7 @@
 #include <strings.h>
 #include <sys/stat.h>
 
-#ifndef __ANDROID__
+#ifndef NULLSPACE_MOBILE
 #include <GLFW/glfw3.h>
 
 GLFWwindow* clipboard_window = nullptr;
@@ -241,7 +241,7 @@ bool CreateFolder(const char* path) {
   return mkdir(path, 0700) == 0;
 }
 void PasteClipboard(char* dest, size_t available_size) {
-#ifndef __ANDROID__
+#ifndef NULLSPACE_MOBILE
   const char* clipboard = glfwGetClipboardString(clipboard_window);
   if (clipboard) {
     for (size_t i = 0; i < available_size && *clipboard && *clipboard != 10; ++i) {

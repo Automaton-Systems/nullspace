@@ -60,7 +60,7 @@ StatBox::StatBox(PlayerManager& player_manager, BannerPool& banners, PacketDispa
   dispatcher.Register(ProtocolS2C::PlayerDeath, OnPlayerDeath, this);
 
   sliding_view.top = 0;
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   sliding_view.size = 8;  // Match radar height on Android
 #else
   sliding_view.size = 20;
@@ -142,7 +142,7 @@ void StatBox::Render(Camera& camera, SpriteRenderer& renderer, Vector2f offset, 
 
   if (!me || view_type == StatViewType::None) return;
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   // Dynamically size the statbox to roughly match the radar's vertical extent,
   // using the same screen-relative formula as Radar.cpp (surface_dim.x / 6).
   float target_height = max_height > 0.0f ? max_height : ((((u16)camera.surface_dim.x / 6) / 4) * 8) / 2;

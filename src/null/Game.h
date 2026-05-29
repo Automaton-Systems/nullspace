@@ -84,7 +84,7 @@ struct Game {
   bool render_radar = false;
   bool menu_open = false;
   bool menu_quit = false;
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   bool show_all_statboxes = false;
 #endif
   int mapzoom = 0;
@@ -116,7 +116,7 @@ struct Game {
   void RenderJoin(float dt);
 
   void RenderMenu();
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   void RenderMenuAndroid();
 #endif
   bool HandleMenuKey(int codepoint, int mods);

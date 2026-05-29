@@ -39,15 +39,15 @@ extern const char* kPlayerName;
 extern const char* kPlayerPassword;
 extern const char* kArenaName;
 
-#ifndef __ANDROID__
-const char* kSecurityServiceIp = "127.0.0.1";
+#if defined(__ANDROID__)
+const char* kSecurityServiceIp = "10.0.2.2";
 const u16 kSecurityServicePort = 8085;
 #else
-const char* kSecurityServiceIp = "10.0.2.2";
+const char* kSecurityServiceIp = "127.0.0.1";
 const u16 kSecurityServicePort = 8085;
 #endif
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
 constexpr bool kDownloadLvz = false;
 #else
 constexpr bool kDownloadLvz = true;

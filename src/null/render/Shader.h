@@ -5,7 +5,7 @@
 
 namespace null {
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
 #define NULL_SHADER_VERSION "#version 300 es"
 #else
 #define NULL_SHADER_VERSION "#version 150"

@@ -40,7 +40,7 @@ precision highp float;
 precision highp int;)"
 
 // Don't define precision for these types since it doesn't work on older desktop opengl versions.
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
     R"(
 precision highp sampler2DArray;
 precision highp usampler2D;)"
@@ -103,7 +103,7 @@ precision mediump float;
 precision mediump int;)"
 
 // Don't define precision for these types since it doesn't work on older desktop opengl versions.
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
     R"(
 precision mediump sampler2DArray;
 precision mediump usampler2D;)"

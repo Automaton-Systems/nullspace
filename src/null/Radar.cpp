@@ -55,7 +55,7 @@ void Radar::Update(Camera& ui_camera, short map_zoom, u16 team_freq, u16 spec_id
   s32 texture_max_y = texture_min_y + ivar8;
 
   ctx.radar_dim = Vector2f(dim, dim);
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   ctx.radar_position = Vector2f(ui_camera.surface_dim.x - dim - kRadarBorder, kRadarBorder);
 #else
   ctx.radar_position = ui_camera.surface_dim - Vector2f(dim, dim) - Vector2f(kRadarBorder, kRadarBorder);

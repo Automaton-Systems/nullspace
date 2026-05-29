@@ -8,6 +8,8 @@
 
 #ifdef __ANDROID__
 #include <null/android/AndroidSettings.h>
+#elif defined(NULLSPACE_MOBILE)
+#include <null/ios/IOSSettings.h>
 #endif
 
 namespace null {
@@ -30,6 +32,8 @@ void OnboardingWizard::Hide() {
   active = false;
 #ifdef __ANDROID__
   g_AndroidSettings.SetWizardShown(true);
+#elif defined(NULLSPACE_MOBILE)
+  g_IOSSettings.SetWizardShown(true);
 #endif
 }
 
