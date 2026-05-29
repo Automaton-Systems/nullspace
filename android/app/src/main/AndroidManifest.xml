@@ -4,6 +4,8 @@
 
     <application
         android:label="NULLORBIT"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:hasCode="true">

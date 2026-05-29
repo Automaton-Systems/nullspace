@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary: NULLORBIT title blue from menutext.bm2 palette -->
+    <color name="colorPrimary">#B5B5FF</color>
+    
+    <!-- Secondary: Pure black -->
+    <color name="colorSecondary">#000000</color>
+    
+    <!-- Additional UI colors from menutext.bm2 palette -->
+    <color name="neon_green">#73FF63</color>
+    <color name="gold">#EFAD21</color>
+    <color name="light_purple">#AD6BF7</color>
+    <color name="dark_gray">#252525</color>
+</resources>

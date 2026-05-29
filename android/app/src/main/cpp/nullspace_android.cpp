@@ -272,12 +272,15 @@ struct nullspace {
     io.DisplayFramebufferScale.x = physical_width / io.DisplaySize.x;
     io.DisplayFramebufferScale.y = physical_height / io.DisplaySize.y;
 
-    // Dark background similar to loading screen
-    ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.05f, 0.95f);
-    ImGui::GetStyle().Colors[ImGuiCol_Button] = ImVec4(0.259f, 0.259f, 0.420f, 1.0f);  // Dark blue from palette
-    ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] = ImVec4(0.388f, 0.388f, 0.580f, 1.0f);  // Lighter blue
-    ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] = ImVec4(0.388f, 0.388f, 1.0f, 0.8f);  // Bright blue on click
-    ImGui::GetStyle().Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);  // White button text
+    // Pure black background to match in-game space
+    ImGui::GetStyle().Colors[ImGuiCol_WindowBg] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);  // Fully opaque black
+    ImGui::GetStyle().Colors[ImGuiCol_Border] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);  // No border
+    ImGui::GetStyle().Colors[ImGuiCol_Button] = ImVec4(0.145f, 0.145f, 0.145f, 1.0f);  // Very dark gray #252525 for button contrast
+    ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered] = ImVec4(0.165f, 0.165f, 0.165f, 1.0f);  // Slightly lighter on hover
+    ImGui::GetStyle().Colors[ImGuiCol_ButtonActive] = ImVec4(0.227f, 0.227f, 0.227f, 1.0f);  // Lighter gray #3A3A3A when pressed
+    ImGui::GetStyle().Colors[ImGuiCol_Text] = ImVec4(0.937f, 0.678f, 0.129f, 1.0f);  // Gold #EFAD21 button text (will pop!)
+    ImGui::GetStyle().WindowBorderSize = 0.0f;  // Remove window border completely
+    ImGui::GetStyle().WindowPadding = ImVec2(0.0f, 0.0f);  // Remove window padding
 
     // Full screen window
     ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -450,12 +453,12 @@ struct nullspace {
 
       
       // NOW draw UI elements on top
-      // Title: NULLORBIT at top (bigger) - Subspace bright blue
+      // Title: NULLORBIT at top (bigger) - Light blue from menutext palette
       ImGui::SetCursorPosY(60);
       ImGui::SetWindowFontScale(5.0f);
       float title_width = ImGui::CalcTextSize("NULLORBIT").x;
       ImGui::SetCursorPosX(center_x - title_width * 0.5f);
-      ImGui::TextColored(ImVec4(0.388f, 0.388f, 1.0f, 1.0f), "NULLORBIT");
+      ImGui::TextColored(ImVec4(0.710f, 0.710f, 1.0f, 1.0f), "NULLORBIT");  // Light blue #B5B5FF
       ImGui::SetWindowFontScale(1.0f);
       
       ImGui::Dummy(ImVec2(0, 80));
@@ -491,7 +494,7 @@ struct nullspace {
       ImGui::PopStyleColor(3);
       ImGui::SetWindowFontScale(1.0f);
       
-      ImGui::Dummy(ImVec2(0, 80));
+      ImGui::Dummy(ImVec2(0, 160));
       
       // "Select an arena:" label
       ImGui::SetCursorPosX(left_start);
