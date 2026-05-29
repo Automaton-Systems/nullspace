@@ -35,9 +35,9 @@ list(FILTER GAME_SOURCES EXCLUDE REGEX "null/android/.*\\.cpp$")
 # iOS ObjC++ game-side files (IOSSettings.mm lives here)
 file(GLOB IOS_GAME_SOURCES ${PROJECT_ROOT}/src/null/ios/*.mm)
 
-# GameMenuAndroid.cpp is now guarded with NULLSPACE_MOBILE and must be included
+# GameMenuMobile.cpp is now guarded with NULLSPACE_MOBILE and must be included
 set(MOBILE_SHARED_SOURCES
-    ${PROJECT_ROOT}/src/null/android/GameMenuAndroid.cpp)
+    ${PROJECT_ROOT}/src/null/android/GameMenuMobile.cpp)
 
 # ── imgui core (no platform backends needed — UIKit handles the menu) ────────
 set(IMGUI_SOURCES
