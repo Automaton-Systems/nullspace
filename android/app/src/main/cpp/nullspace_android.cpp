@@ -110,6 +110,7 @@ void InitializeSettings() {
 
 const char* kPlayerName = "null space";
 const char* kPlayerPassword = "none";
+const char* kArenaName = "";
 
 struct ServerInfo {
   const char* name;
@@ -225,10 +226,11 @@ struct nullspace {
     return true;
   }
 
-  bool JoinZone(size_t selected_index) {
+  bool JoinZone(size_t selected_index, const char* arena_name) {
     kServerName = kServers[selected_index].name;
     kServerIp = kServers[selected_index].server;
     kServerPort = kServers[selected_index].port;
+    kArenaName = arena_name;
 
     perm_arena.Reset();
 
@@ -500,6 +502,35 @@ struct nullspace {
       ImGui::TextColored(ImVec4(0.937f, 0.937f, 1.0f, 1.0f), "Select an arena:");  // Off-white
       ImGui::SetWindowFontScale(1.0f);
       
+      // Emulator button (only show in debug builds) - small button in top-right corner
+      #ifdef NDEBUG
+        // Release build - check if running on emulator
+        bool show_emulator = false;
+      #else
+        // Debug build - always show
+        bool show_emulator = true;
+      #endif
+      
+      if (show_emulator) {
+        // Save current cursor position before drawing emulator button
+        ImVec2 saved_cursor = ImGui::GetCursorPos();
+        
+        float emu_size = 125.0f;
+        float emu_margin = 20.0f;
+        ImGui::SetCursorPos(ImVec2(io.DisplaySize.x - emu_size - emu_margin, emu_margin));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
+        ImGui::SetWindowFontScale(1.0f);
+        if (ImGui::Button("EMU", ImVec2(emu_size, emu_size))) {
+          selected_zone_index = 0;  // "emulator" server
+          JoinZone(selected_zone_index, "");  // No arena name - use auto placement
+        }
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::PopStyleVar();
+        
+        // Restore cursor position so other buttons draw in correct location
+        ImGui::SetCursorPos(saved_cursor);
+      }
+      
       ImGui::Dummy(ImVec2(0, 50));
       
       // Trench Wars button
@@ -510,30 +541,21 @@ struct nullspace {
       // Trench Wars button - text centered in button
       ImGui::SetWindowFontScale(1.8f);
       if (ImGui::Button("Trench Wars: Capture the Flag", ImVec2(button_width, button_height))) {
-        selected_zone_index = 1;  // "local" server
-        JoinZone(selected_zone_index);
+        selected_zone_index = 1;  // Null Orbit production server
+        JoinZone(selected_zone_index, "pub");
       }
       ImGui::SetWindowFontScale(1.0f);
       
-      // Emulator button (only show in debug builds) - at bottom of screen
-      #ifdef NDEBUG
-        // Release build - check if running on emulator
-        bool show_emulator = false;
-      #else
-        // Debug build - always show
-        bool show_emulator = true;
-      #endif
+      ImGui::Dummy(ImVec2(0, 30));
       
-      if (show_emulator) {
-        float emulator_button_y = io.DisplaySize.y - (button_height * 0.6f) - 30;
-        ImGui::SetCursorPos(ImVec2(button_margin, emulator_button_y));
-        ImGui::SetWindowFontScale(1.5f);
-        if (ImGui::Button("Emulator (Test)", ImVec2(button_width, button_height * 0.6f))) {
-          selected_zone_index = 0;  // "emulator" server
-          JoinZone(selected_zone_index);
-        }
-        ImGui::SetWindowFontScale(1.0f);
+      // Team Deathmatch button
+      ImGui::SetCursorPosX(button_margin);
+      ImGui::SetWindowFontScale(1.8f);
+      if (ImGui::Button("Team Deathmatch", ImVec2(button_width, button_height))) {
+        selected_zone_index = 1;  // Null Orbit production server
+        JoinZone(selected_zone_index, "tdm");
       }
+      ImGui::SetWindowFontScale(1.0f);
       
       ImGui::PopStyleVar();
       

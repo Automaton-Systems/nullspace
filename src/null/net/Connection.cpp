@@ -37,6 +37,7 @@ namespace null {
 
 extern const char* kPlayerName;
 extern const char* kPlayerPassword;
+extern const char* kArenaName;
 
 #ifndef __ANDROID__
 const char* kSecurityServiceIp = "127.0.0.1";
@@ -572,7 +573,10 @@ void Connection::ProcessPacket(u8* pkt, size_t size) {
         }
 
         if (response == 0x00 || response == 0x0D) {
-          SendArenaLogin(8, 0, 1920, 1080, 0xFFFF, "");
+          // If arena name is specified, use -3 (0xFFFD) to request that specific arena
+          // If arena name is empty, use -1 (0xFFFF) for auto placement
+          u16 arena_type = (kArenaName && kArenaName[0]) ? 0xFFFD : 0xFFFF;
+          SendArenaLogin(8, 0, 1920, 1080, arena_type, kArenaName);
           login_state = LoginState::ArenaLogin;
         } else if (response == 0x01) {
           // Send password packet again requesting the registration form
