@@ -10,6 +10,8 @@
 //
 #ifdef __ANDROID__
 #include <null/android/AndroidSettings.h>
+#elif defined(NULLSPACE_MOBILE)
+#include <null/ios/IOSSettings.h>
 #endif
 //
 #include <assert.h>
@@ -398,6 +400,10 @@ bool Game::Update(const InputState& input, float dt) {
     if (!g_AndroidSettings.wizard_shown) {
       onboarding.Show();
     }
+#elif defined(NULLSPACE_MOBILE)
+    if (!g_IOSSettings.wizard_shown) {
+      onboarding.Show();
+    }
 #endif
   }
 
@@ -671,7 +677,7 @@ void Game::Render(float dt) {
 
   char fps_text[32];
   sprintf(fps_text, "FPS: %d", (int)(fps + 0.5f));
-#ifndef __ANDROID__
+#ifndef NULLSPACE_MOBILE
   sprite_renderer.DrawText(ui_camera, fps_text, TextColor::Pink, Vector2f(ui_camera.surface_dim.x, 24), Layer::TopMost,
                            TextAlignment::Right);
 #endif
@@ -726,7 +732,7 @@ void Game::RenderGame(float dt) {
     // Using glBufferData (stream draw) in Render() avoids CPU-GPU sync stalls on mobile.
     sprite_renderer.Render(camera);
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
     // Skip ship HUD rendering when showing all statboxes to avoid overlapping
     if (!show_all_statboxes) {
       ship_controller.Render(ui_camera, camera, sprite_renderer);
@@ -756,7 +762,7 @@ void Game::RenderGame(float dt) {
     chat.Render(ui_camera, sprite_renderer);
   }
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   // Render multiple statboxes when requested
   if (show_all_statboxes) {
     StatViewType original_view = statbox.view_type;
@@ -804,7 +810,7 @@ void Game::RenderGame(float dt) {
   statbox.Render(ui_camera, sprite_renderer);
 #endif
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   // Only render "Main Menu" button when not showing all statboxes
   if (!show_all_statboxes) {
     const float kMenuButtonWidth = 120.0f;
@@ -844,7 +850,7 @@ void Game::RenderGame(float dt) {
     RenderMenu();
   }
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   // Render onboarding wizard (full screen overlay)
   onboarding.Render(ui_camera, sprite_renderer);
 #endif
@@ -963,7 +969,7 @@ bool Game::HandleMenuKey(int codepoint, int mods) {
 }
 
 void Game::RenderMenu() {
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   RenderMenuAndroid();
 #else
   const char* kLeftMenuText[] = {"Q  = Quit",        "F1 = Help",          "F2 = Stat Box",

@@ -43,7 +43,8 @@ add_library(nullspace-android
 # Use target_compile_definitions for better practice
 target_compile_definitions(nullspace-android PRIVATE
     IMGUI_IMPL_OPENGL_LOADER_GLAD
-    IMGUI_IMPL_OPENGL_ES3)
+    IMGUI_IMPL_OPENGL_ES3
+    NULLSPACE_MOBILE)
 
 target_include_directories(nullspace-android PRIVATE
         ${PROJECT_ROOT}/lib

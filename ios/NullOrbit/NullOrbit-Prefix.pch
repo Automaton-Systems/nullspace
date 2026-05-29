@@ -1,0 +1,8 @@
+// NullOrbit-Prefix.pch
+// Force ObjC runtime headers to be included before any C/C++ headers
+// (in particular before glad/glad.h which sets __gl_h_ and similar guards).
+
+#ifdef __OBJC__
+#  import <Foundation/Foundation.h>
+#  import <UIKit/UIKit.h>
+#endif

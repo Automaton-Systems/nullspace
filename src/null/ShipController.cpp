@@ -830,7 +830,7 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
   // the bar and the radar.
   int energy = (int)self->energy;
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   // The energy bar spans [center - kAndroidBarWidth, center + kAndroidBarWidth]
   // (RenderEnergyDisplay draws two halves of width kBarWidth on either side of center).
   constexpr float kAndroidBarWidth = 160.0f;  // Must match RenderEnergyDisplay
@@ -917,7 +917,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
 
   if (!self) return;
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   // Stack the timed indicators upward from above the topmost right-side icon
   // (the right icon column - gun/bomb/stealth/etc - starts at surface_dim.y - 160).
   // Reserve = 160 (top of right icons) + small gap.
@@ -984,7 +984,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
 
   RenderEnergyDisplay(ui_camera, renderer);
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   float y = ui_camera.surface_dim.y - 175.0f - 10.0f;
 #else
   float y = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
@@ -999,7 +999,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   RenderItemIndicator(ui_camera, renderer, ship.portals, 46, &y);
 
   float x = ui_camera.surface_dim.x - 26;
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   y = ui_camera.surface_dim.y - 150.0f - 10.0f;
 #else
   y = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
@@ -1064,7 +1064,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   }
   y += 25.0f;
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   // Weapon buttons: GUN and BOMB (round, grey border, blue fill, white text)
   float button_size = 72.0f;
   float button_radius = button_size / 2.0f;
@@ -1105,9 +1105,9 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   }
   
   // Button text changes based on mine mode toggle state
-  extern bool g_AndroidMineMode;
-  const char* bomb_button_text = g_AndroidMineMode ? "MINE" : "BOMB";
-  TextColor button_text_color = g_AndroidMineMode ? TextColor::Yellow : TextColor::White;
+  extern bool g_MobileMineMode;
+  const char* bomb_button_text = g_MobileMineMode ? "MINE" : "BOMB";
+  TextColor button_text_color = g_MobileMineMode ? TextColor::Yellow : TextColor::White;
   renderer.DrawText(ui_camera, bomb_button_text, button_text_color,
                    Vector2f(bomb_cx, button_center_y - 5), Layer::AfterChat, TextAlignment::Center);
   
@@ -1186,7 +1186,7 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
       renderer.Draw(ui_camera, line, Vector2f(x1, y1), Layer::AfterChat);
     }
   }
-#endif  // __ANDROID__
+#endif  // NULLSPACE_MOBILE
 }
 
 void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& renderer) {
@@ -1200,7 +1200,7 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
   Vector2f health_position(ui_camera.surface_dim.x * 0.5f - healthbar.dimensions.x * 0.5f, 0);
 
   SpriteRenderable top_display_full = Graphics::anim_health_high.frames[5];
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   const float kBarWidth = 160.0f;
 #else
   const float kBarWidth = 240.0f;
@@ -2051,8 +2051,8 @@ void ShipController::ResetShip() {
 
   u32 pristine_seed = player_manager.connection.security.prize_seed;
 
-#ifdef __ANDROID__
-  // NullOrbit: Fixed initial loadout for Android
+#ifdef NULLSPACE_MOBILE
+  // NullOrbit: Fixed initial loadout for mobile (Android + iOS)
   // Give everyone exactly level 1 gun and stealth; only give bomb if the ship allows it
   ship.guns = 1;
   if (ship_settings.MaxBombs > 0) ship.bombs = 1;

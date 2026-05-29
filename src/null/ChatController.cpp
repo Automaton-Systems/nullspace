@@ -409,7 +409,7 @@ void ChatController::Render(Camera& camera, SpriteRenderer& renderer) {
     end = 0;
   }
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   u32 current_tick = GetCurrentTick();
 #endif
 
@@ -417,7 +417,7 @@ void ChatController::Render(Camera& camera, SpriteRenderer& renderer) {
     size_t index = (i - 1) % NULLSPACE_ARRAY_SIZE(entries);
     ChatEntry* entry = entries + index;
 
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
     // Skip expired entries on Android
     if (TICK_GT(current_tick, entry->end_tick)) {
       continue;
@@ -726,7 +726,7 @@ ChatEntry* ChatController::PushEntry(const char* mesg, size_t size, ChatType typ
   entry->sender[0] = 0;
   entry->type = type;
   entry->sound = 0;
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
   entry->end_tick = GetCurrentTick() + 1500;  // 15 seconds (1500 ticks * 10ms)
 #endif
 

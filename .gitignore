@@ -32,6 +32,7 @@ android/.idea/workspace.xml
 android/.idea/navEditor.xml
 android/.idea/assetWizardSettings.xml
 android/app/src/main/assets/
+ios/assets/
 .DS_Store
 android/build
 android/captures

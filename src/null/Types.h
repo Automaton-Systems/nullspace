@@ -8,6 +8,16 @@
 
 #define NULLSPACE_ARRAY_SIZE(a) (sizeof(a) / sizeof(*a))
 
+// NULLSPACE_MOBILE is defined on all mobile (non-desktop) builds.
+#if defined(__ANDROID__)
+#  define NULLSPACE_MOBILE 1
+#elif defined(__APPLE__)
+#  include <TargetConditionals.h>
+#  if TARGET_OS_IOS
+#    define NULLSPACE_MOBILE 1
+#  endif
+#endif
+
 namespace null {
 
 using s8 = int8_t;

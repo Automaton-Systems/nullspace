@@ -1,4 +1,4 @@
-#ifdef __ANDROID__
+#ifdef NULLSPACE_MOBILE
 
 #include <null/Game.h>
 
@@ -90,4 +90,4 @@ void Game::RenderMenuAndroid() {
 
 }  // namespace null
 
-#endif  // __ANDROID__
+#endif  // NULLSPACE_MOBILE
