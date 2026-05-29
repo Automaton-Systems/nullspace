@@ -9,6 +9,7 @@ bin
 *.so
 *.o
 .vs
+.idea/
 *.vcxproj.filters
 *.vcxproj.user
 maps
