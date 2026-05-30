@@ -792,9 +792,9 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             float button_size = 72.0f;
             float button_radius = button_size / 2.0f;
             float button_spacing = 12.0f;
-            float button_y = logical_screen_height - button_size - 10.0f;
+            float button_y = logical_screen_height - button_size - 55.0f;  // Slightly higher for padding
             float button_center_y = button_y + button_radius;
-            float gun_button_x = logical_screen_width - (button_size * 2) - button_spacing - 40.0f;  // Adjusted margin
+            float gun_button_x = logical_screen_width - (button_size * 2) - button_spacing - 50.0f;  // Slightly more left
             float bomb_button_x = gun_button_x + button_size + button_spacing;
             float gun_cx = gun_button_x + button_radius;
             float bomb_cx = bomb_button_x + button_radius;
@@ -811,14 +811,16 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             }
             
             // Check if this pointer is on ability icon (ONLY on DOWN events, not MOVE)
+            // Abilities are now horizontal at the very bottom, rotated 90° CCW, growing upward
             if ((flags == AMOTION_EVENT_ACTION_DOWN || flags == AMOTION_EVENT_ACTION_POINTER_DOWN) && !android_input.abilities_triggered) {
-              float item_stack_height = 175.0f;
-              float items_start_y = logical_screen_height - item_stack_height - 10.0f;
-              float item_width = 26.0f;
-              float item_height = 25.0f;
+              float ability_y = logical_screen_height;  // At screen bottom
+              float ability_x_start = logical_screen_width - 250.0f;  // Slightly more left for margin
+              float ability_item_width = 30.0f;  // Horizontal spacing
+              float ability_item_height = 26.0f;  // Height of rotated icon
               
-              if (logical_x >= 0 && logical_x <= item_width && logical_y >= items_start_y) {
-                int item_index = (int)((logical_y - items_start_y) / item_height);
+              // Check if touch is within the ability button area (icons grow upward from bottom)
+              if (logical_y >= ability_y - ability_item_height && logical_y <= ability_y && logical_x >= ability_x_start) {
+                int item_index = (int)((logical_x - ability_x_start) / ability_item_width);
                 if (item_index >= 0 && item_index < 7) {
                   // Trigger ability once on DOWN
                   null::InputAction action;
@@ -928,6 +930,17 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
           // Reset ability trigger flag when any pointer is lifted
           // This allows subsequent taps while other fingers remain down
           android_input.abilities_triggered = false;
+          // Clear ability actions immediately when finger lifts (for multi-touch)
+          if (self->ship < 8) {
+            null::g_InputState.SetAction(null::InputAction::Burst, false);
+            null::g_InputState.SetAction(null::InputAction::Repel, false);
+            null::g_InputState.SetAction(null::InputAction::Decoy, false);
+            null::g_InputState.SetAction(null::InputAction::Thor, false);
+            null::g_InputState.SetAction(null::InputAction::Brick, false);
+            null::g_InputState.SetAction(null::InputAction::Rocket, false);
+            null::g_InputState.SetAction(null::InputAction::Portal, false);
+            null::g_InputState.SetAction(null::InputAction::Warp, false);
+          }
         } else if (flags == AMOTION_EVENT_ACTION_UP) {
           android_input.anchored = false;
           android_input.joystick_active = false;
@@ -1139,13 +1152,13 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             float logical_y = y * (null::g_nullspace.surface_height / (float)screen_height);
             float logical_screen_height = (float)null::g_nullspace.surface_height;
             
-            // D-pad position: same as weapon buttons but on left side
+            // D-pad position: 20px from left and 20px from bottom (equal padding)
             float dpad_size = 140.0f;  // Increased from 80
             float dpad_radius = dpad_size / 2.0f;
-            float dpad_center_x = 50.0f + dpad_radius;  // Adjusted: 50px from left + radius
+            float dpad_center_x = 20.0f + dpad_radius;  // 20px from left edge
             float button_size = 72.0f;
-            float button_y = logical_screen_height - button_size - 10.0f;
-            float dpad_center_y = button_y + button_size / 2.0f - 40.0f - (logical_screen_height * 0.05f);  // 40px + 5% screen height higher than buttons
+            float button_y = logical_screen_height - button_size - 55.0f;  // Match weapon buttons
+            float dpad_center_y = button_y + button_size / 2.0f - 20.0f;  // 20px higher
             
             // Check if touch is in d-pad area (generous extended zone for dragging outside)
             float dx = logical_x - dpad_center_x;

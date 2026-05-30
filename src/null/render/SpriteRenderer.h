@@ -55,6 +55,7 @@ struct SpriteRenderer {
   // Position can be either in world space or screen space depending on renderer setup
   void Draw(Camera& camera, const SpriteRenderable& renderable, const Vector2f& position, Layer layer);
   void Draw(Camera& camera, const SpriteRenderable& renderable, const Vector3f& position);
+  void DrawRotated90(Camera& camera, const SpriteRenderable& renderable, const Vector2f& position, Layer layer);
   void DrawText(Camera& camera, const char* text, TextColor color, const Vector2f& position, Layer layer,
                 TextAlignment alignment = TextAlignment::Left);
 

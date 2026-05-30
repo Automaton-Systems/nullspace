@@ -985,22 +985,34 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   RenderEnergyDisplay(ui_camera, renderer);
 
 #ifdef NULLSPACE_MOBILE
-  float y = ui_camera.surface_dim.y - 175.0f - 10.0f;
+  // Horizontal ability icons at bottom (moved from left side)
+  float ability_y = ui_camera.surface_dim.y;  // At screen bottom, icons grow upward
+  float ability_x_start = ui_camera.surface_dim.x - 250.0f;  // Slightly more left for margin from right icons
+  float ability_x = ability_x_start;
+  
+  RenderItemIndicator(ui_camera, renderer, ship.bursts, 30, &ability_x, &ability_y, true);  // true = rotate
+  RenderItemIndicator(ui_camera, renderer, ship.repels, 31, &ability_x, &ability_y, true);
+  RenderItemIndicator(ui_camera, renderer, ship.decoys, 40, &ability_x, &ability_y, true);
+  RenderItemIndicator(ui_camera, renderer, ship.thors, 41, &ability_x, &ability_y, true);
+  RenderItemIndicator(ui_camera, renderer, ship.bricks, 42, &ability_x, &ability_y, true);
+  RenderItemIndicator(ui_camera, renderer, ship.rockets, 43, &ability_x, &ability_y, true);
+  RenderItemIndicator(ui_camera, renderer, ship.portals, 46, &ability_x, &ability_y, true);
 #else
   float y = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
+
+  RenderItemIndicator(ui_camera, renderer, ship.bursts, 30, nullptr, &y, false);
+  RenderItemIndicator(ui_camera, renderer, ship.repels, 31, nullptr, &y, false);
+  RenderItemIndicator(ui_camera, renderer, ship.decoys, 40, nullptr, &y, false);
+  RenderItemIndicator(ui_camera, renderer, ship.thors, 41, nullptr, &y, false);
+  RenderItemIndicator(ui_camera, renderer, ship.bricks, 42, nullptr, &y, false);
+  RenderItemIndicator(ui_camera, renderer, ship.rockets, 43, nullptr, &y, false);
+  RenderItemIndicator(ui_camera, renderer, ship.portals, 46, nullptr, &y, false);
 #endif
 
-  RenderItemIndicator(ui_camera, renderer, ship.bursts, 30, &y);
-  RenderItemIndicator(ui_camera, renderer, ship.repels, 31, &y);
-  RenderItemIndicator(ui_camera, renderer, ship.decoys, 40, &y);
-  RenderItemIndicator(ui_camera, renderer, ship.thors, 41, &y);
-  RenderItemIndicator(ui_camera, renderer, ship.bricks, 42, &y);
-  RenderItemIndicator(ui_camera, renderer, ship.rockets, 43, &y);
-  RenderItemIndicator(ui_camera, renderer, ship.portals, 46, &y);
-
   float x = ui_camera.surface_dim.x - 26;
+  float y;
 #ifdef NULLSPACE_MOBILE
-  y = ui_camera.surface_dim.y - 150.0f - 10.0f;
+  y = ui_camera.surface_dim.y - 150.0f - 10.0f;  // Original position
 #else
   y = ((ui_camera.surface_dim.y * 0.57f) + 1.0f) - 25.0f * 4;
 #endif
@@ -1069,9 +1081,9 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   float button_size = 72.0f;
   float button_radius = button_size / 2.0f;
   float button_spacing = 12.0f;
-  float button_y = ui_camera.surface_dim.y - button_size - 10.0f;
+  float button_y = ui_camera.surface_dim.y - button_size - 55.0f;  // Slightly higher for padding
   float button_center_y = button_y + button_radius;
-  float gun_button_x = ui_camera.surface_dim.x - (button_size * 2) - button_spacing - 40.0f;  // Adjusted margin
+  float gun_button_x = ui_camera.surface_dim.x - (button_size * 2) - button_spacing - 50.0f;  // Slightly more left
   float bomb_button_x = gun_button_x + button_size + button_spacing;
   float gun_cx = gun_button_x + button_radius;
   float bomb_cx = bomb_button_x + button_radius;
@@ -1111,11 +1123,11 @@ void ShipController::RenderIndicators(Camera& ui_camera, SpriteRenderer& rendere
   renderer.DrawText(ui_camera, bomb_button_text, button_text_color,
                    Vector2f(bomb_cx, button_center_y - 5), Layer::AfterChat, TextAlignment::Center);
   
-  // Virtual D-Pad in bottom-left (next to ability icons, moved up more)
+  // Virtual D-Pad in bottom-left
   float dpad_size = 140.0f;  // Total d-pad diameter (increased from 80)
   float dpad_radius = dpad_size / 2.0f;
-  float dpad_x = 50.0f + dpad_radius;  // 50px from left edge + radius (adjusted from 30px)
-  float dpad_y = button_y + button_size/2 - 40.0f;  // 40px higher than weapon buttons
+  float dpad_x = 20.0f + dpad_radius;  // 20px from left edge
+  float dpad_y = button_y + button_size/2 - 20.0f;  // 20px from bottom (same as left padding)
   
   // Draw outer circle (base)
   for (int i = 0; i < 32; ++i) {
@@ -1241,20 +1253,55 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
 }
 
 void ShipController::RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index,
-                                         float* y) {
+                                         float* x, float* y, bool rotate) {
   if (value > 0) {
-    renderer.Draw(ui_camera, Graphics::icon_sprites[index], Vector2f(0, *y), Layer::Gauges);
-
-    if (value > 9) {
-      renderer.Draw(ui_camera, Graphics::icon_count_sprites[10], Vector2f(23, *y + 5), Layer::Gauges);
-    } else if (value > 1) {
-      renderer.Draw(ui_camera, Graphics::icon_count_sprites[value], Vector2f(23, *y + 5), Layer::Gauges);
+    float pos_x = x ? *x : 0.0f;
+    float pos_y = y ? *y : 0.0f;
+    
+    if (rotate) {
+      // Rotated 90° CCW - position at bottom, icon grows upward
+      // After rotation, original width becomes height, so offset by original width
+      float icon_width = Graphics::icon_sprites[index].dimensions.x * ui_camera.scale;
+      float icon_height = Graphics::icon_sprites[index].dimensions.y * ui_camera.scale;
+      renderer.DrawRotated90(ui_camera, Graphics::icon_sprites[index], Vector2f(pos_x, pos_y - icon_width), Layer::Gauges);
+      
+      if (value > 9) {
+        // Position count indicator: original was bottom-right (x+23, y+5)
+        // After 90° CCW: bottom→right, right→top
+        // Keep count upright (not rotated) for readability
+        renderer.Draw(ui_camera, Graphics::icon_count_sprites[10], 
+                     Vector2f(pos_x + icon_height - 5.0f, pos_y - icon_width - 3.0f), Layer::Gauges);
+      } else if (value > 1) {
+        renderer.Draw(ui_camera, Graphics::icon_count_sprites[value], 
+                     Vector2f(pos_x + icon_height - 5.0f, pos_y - icon_width - 3.0f), Layer::Gauges);
+      }
+    } else {
+      renderer.Draw(ui_camera, Graphics::icon_sprites[index], Vector2f(pos_x, pos_y), Layer::Gauges);
+      
+      if (value > 9) {
+        renderer.Draw(ui_camera, Graphics::icon_count_sprites[10], Vector2f(pos_x + 23, pos_y + 5), Layer::Gauges);
+      } else if (value > 1) {
+        renderer.Draw(ui_camera, Graphics::icon_count_sprites[value], Vector2f(pos_x + 23, pos_y + 5), Layer::Gauges);
+      }
     }
   } else {
-    renderer.Draw(ui_camera, Graphics::empty_icon_sprites[0], Vector2f(0, *y), Layer::Gauges);
+    float pos_x = x ? *x : 0.0f;
+    float pos_y = y ? *y : 0.0f;
+    
+    if (rotate) {
+      float icon_width = Graphics::empty_icon_sprites[0].dimensions.x * ui_camera.scale;
+      renderer.DrawRotated90(ui_camera, Graphics::empty_icon_sprites[0], Vector2f(pos_x, pos_y - icon_width), Layer::Gauges);
+    } else {
+      renderer.Draw(ui_camera, Graphics::empty_icon_sprites[0], Vector2f(pos_x, pos_y), Layer::Gauges);
+    }
   }
 
-  *y += 25.0f;
+  if (x) {
+    *x += 30.0f;  // Horizontal spacing
+  }
+  if (y && !x) {
+    *y += 25.0f;  // Vertical spacing (only if not horizontal mode)
+  }
 }
 
 size_t ShipController::GetGunIconIndex() {

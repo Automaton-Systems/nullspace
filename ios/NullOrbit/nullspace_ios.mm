@@ -651,10 +651,11 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
       (flags == AMOTION_MOVE || flags == AMOTION_DOWN || flags == AMOTION_POINTER_DOWN)) {
     float button_size   = 72.0f;
     float button_radius = button_size / 2.0f;
-    float button_y      = lh - button_size - 10.0f;
+    float button_spacing = 12.0f;
+    float button_y      = lh - button_size - 55.0f;  // Match Android padding
     float button_cy     = button_y + button_radius;
-    float gun_x         = lw - (button_size * 2) - 12.0f - 40.0f;
-    float bomb_x        = gun_x + button_size + 12.0f;
+    float gun_x         = lw - (button_size * 2) - button_spacing - 50.0f;  // Match Android margin
+    float bomb_x        = gun_x + button_size + button_spacing;
     float gun_cx        = gun_x  + button_radius;
     float bomb_cx       = bomb_x + button_radius;
 
@@ -664,11 +665,15 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
     bool bomb_pressed = (bdx*bdx + bdy*bdy <= button_radius*button_radius*1.5f);
 
     if (flags == AMOTION_DOWN && !ios_input.abilities_triggered) {
-      // Right-side toggle icons
+      // Right-side toggle icons (gun, bomb, stealth, cloak, xradar, antiwarp)
       float ri_x       = lw - 26.0f;
       float ri_start_y = lh - 160.0f;
-      if (logical_x >= ri_x && logical_y >= ri_start_y) {
-        int ri = (int)((logical_y - ri_start_y) / 25.0f);
+      float ri_width   = 26.0f;
+      float ri_height  = 25.0f;
+      
+      if (logical_x >= ri_x && logical_x <= lw && logical_y >= ri_start_y) {
+        int ri = (int)((logical_y - ri_start_y) / ri_height);
+        // Index 0 = gun (multifire toggle), 1 = bomb (mine mode toggle), 2 = stealth, 3 = cloak, 4 = xradar, 5 = antiwarp
         if (ri == 0) {
           if (g_InputState.action_callback)
             g_InputState.action_callback(g_InputState.user, null::InputAction::Multifire);
@@ -705,15 +710,19 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
     }
   }
 
-  // ── Left-side ability icons (left-slot pointer only) ──────────────────────
+  // ── Bottom ability icons (right-slot pointer only) ────────────────────────
   // Don't process game input when menu is open
-  if (!game->menu_open && self->ship < 8 && owns_left &&
+  // Now horizontal at bottom, rotated 90° CCW, matching Android layout
+  if (!game->menu_open && self->ship < 8 && owns_right &&
       flags == AMOTION_DOWN && !ios_input.abilities_triggered) {
-    float item_stack_h  = 175.0f;
-    float items_start_y = lh - item_stack_h - 10.0f;
-    float item_w = 26.0f, item_h = 25.0f;
-    if (logical_x >= 0 && logical_x <= item_w && logical_y >= items_start_y) {
-      int idx = (int)((logical_y - items_start_y) / item_h);
+    float ability_y = lh;  // At screen bottom
+    float ability_x_start = lw - 250.0f;  // Slightly more left for margin
+    float ability_item_width = 30.0f;  // Horizontal spacing
+    float ability_item_height = 26.0f;  // Height of rotated icon
+    
+    // Check if touch is within the ability button area (icons grow upward from bottom)
+    if (logical_y >= ability_y - ability_item_height && logical_y <= ability_y && logical_x >= ability_x_start) {
+      int idx = (int)((logical_x - ability_x_start) / ability_item_width);
       if (idx >= 0 && idx < 7) {
         null::InputAction act;
         switch (idx) {
@@ -886,12 +895,13 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
       }
     } else if (owns_left) {
       // Joystick movement: only the left-slot pointer drives the dpad
+      // Match Android positioning: 20px from left and 20px from bottom
       float dpad_size   = 140.0f;
       float dpad_radius = dpad_size / 2.0f;
-      float dpad_cx     = 50.0f + dpad_radius;
+      float dpad_cx     = 20.0f + dpad_radius;  // 20px from left edge (match Android)
       float btn_size    = 72.0f;
-      float btn_y       = lh - btn_size - 10.0f;
-      float dpad_cy     = btn_y + btn_size/2.0f - 40.0f - (lh * 0.05f);
+      float btn_y       = lh - btn_size - 55.0f;  // Match weapon button positioning
+      float dpad_cy     = btn_y + btn_size/2.0f - 20.0f;  // 20px higher (match Android)
 
       float dx  = logical_x - dpad_cx;
       float dy  = logical_y - dpad_cy;

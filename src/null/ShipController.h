@@ -160,7 +160,7 @@ struct ShipController {
   void Render(Camera& ui_camera, Camera& camera, SpriteRenderer& renderer);
   void RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& renderer);
   void RenderIndicators(Camera& ui_camera, SpriteRenderer& renderer);
-  void RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index, float* y);
+  void RenderItemIndicator(Camera& ui_camera, SpriteRenderer& renderer, int value, size_t index, float* x, float* y, bool rotate);
   size_t GetGunIconIndex();
   size_t GetBombIconIndex();
 

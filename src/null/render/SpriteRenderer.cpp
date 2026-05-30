@@ -246,6 +246,39 @@ void SpriteRenderer::Draw(Camera& camera, const SpriteRenderable& renderable, co
   Draw(camera, renderable, Vector3f(position.x, position.y, (float)layer));
 }
 
+void SpriteRenderer::DrawRotated90(Camera& camera, const SpriteRenderable& renderable, const Vector2f& position, Layer layer) {
+  // Draw sprite rotated 90 degrees counter-clockwise
+  SpritePushElement* element = memory_arena_push_type(&push_buffer, SpritePushElement);
+  GLuint* texture_storage = memory_arena_push_type(&texture_push_buffer, GLuint);
+
+  *texture_storage = renderable.texture;
+
+  Vector2f dimensions = renderable.dimensions * camera.scale;
+  Vector3f pos3(position.x, position.y, (float)layer);
+  
+  // For 90° CCW rotation:
+  // Swap dimensions (width becomes height, height becomes width)
+  // Remap UVs: TL(0)→TR(1), TR(1)→BR(3), BL(2)→TL(0), BR(3)→BL(2)
+  
+  element->vertices[0].position = pos3;
+  element->vertices[0].uv = renderable.uvs[1];  // TL→TR
+
+  element->vertices[1].position = pos3 + Vector3f(dimensions.y, 0, 0);
+  element->vertices[1].uv = renderable.uvs[3];  // TR→BR
+
+  element->vertices[2].position = pos3 + Vector3f(0, dimensions.x, 0);
+  element->vertices[2].uv = renderable.uvs[0];  // BL→TL
+
+  element->vertices[3].position = pos3 + Vector3f(0, dimensions.x, 0);
+  element->vertices[3].uv = renderable.uvs[0];  // BL→TL
+
+  element->vertices[4].position = pos3 + Vector3f(dimensions.y, 0, 0);
+  element->vertices[4].uv = renderable.uvs[3];  // TR→BR
+
+  element->vertices[5].position = pos3 + Vector3f(dimensions.y, dimensions.x, 0);
+  element->vertices[5].uv = renderable.uvs[2];  // BR→BL
+}
+
 void SpriteRenderer::Draw(Camera& camera, const SpriteRenderable& renderable, const Vector3f& position) {
   SpritePushElement* element = memory_arena_push_type(&push_buffer, SpritePushElement);
   GLuint* texture_storage = memory_arena_push_type(&texture_push_buffer, GLuint);
