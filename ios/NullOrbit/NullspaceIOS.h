@@ -10,6 +10,9 @@ extern "C" {
 // Call once after the EAGLLayer is configured. layer is a CAEAGLLayer*.
 void iOSInit(void* eagl_layer, int physical_width, int physical_height, float screen_scale, bool is_tablet);
 
+// Update safe area insets (physical pixels). Call from viewDidLayoutSubviews.
+void iOSSetSafeArea(int left, int right, int top, int bottom);
+
 // Render one frame and present. Called by CADisplayLink.
 void iOSTick(void);
 

@@ -58,6 +58,10 @@ static int          g_ViewportY        = 0;
 static int          g_ViewportWidth    = 0;
 static int          g_ViewportHeight   = 0;
 static bool         g_Initialized      = false;
+static int          g_SafeLeft         = 0;
+static int          g_SafeRight        = 0;
+static int          g_SafeTop          = 0;
+static int          g_SafeBottom       = 0;
 
 // ── touch input state ────────────────────────────────────────────────────────
 static const int64_t DOUBLE_TAP_TIMEOUT  = 300LL * 1000000LL;  // ns
@@ -448,26 +452,41 @@ static bool CreateFramebuffer(CAEAGLLayer* layer, int physical_width, int physic
 }
 
 static void ConfigureRenderViewport(float screen_scale) {
-  int padding = (int)(24.0f * screen_scale + 0.5f);
+  // Use actual safe area insets (set by iOSSetSafeArea from viewDidLayoutSubviews).
+  // Falls back to a small minimum inset to handle rounded corners on devices that
+  // haven't reported safe area yet or have no notch.
+  int min_inset = (int)(4.0f * screen_scale + 0.5f);
+  int left   = (g_SafeLeft   > min_inset) ? g_SafeLeft   : min_inset;
+  int right  = (g_SafeRight  > min_inset) ? g_SafeRight  : min_inset;
+  int top    = (g_SafeTop    > min_inset) ? g_SafeTop    : min_inset;
+  int bottom = (g_SafeBottom > min_inset) ? g_SafeBottom : min_inset;
 
-  g_ViewportX = padding;
-  g_ViewportY = padding;
-  g_ViewportWidth = g_PhysicalWidth - padding * 2;
-  g_ViewportHeight = g_PhysicalHeight - padding * 2;
+  // OpenGL origin is bottom-left, so 'top' maps to the Y offset from the bottom.
+  g_ViewportX      = left;
+  g_ViewportY      = bottom;
+  g_ViewportWidth  = g_PhysicalWidth  - left - right;
+  g_ViewportHeight = g_PhysicalHeight - top  - bottom;
 
-  if (g_ViewportWidth < 1) {
-    g_ViewportX = 0;
-    g_ViewportWidth = g_PhysicalWidth;
-  }
-  if (g_ViewportHeight < 1) {
-    g_ViewportY = 0;
-    g_ViewportHeight = g_PhysicalHeight;
-  }
+  if (g_ViewportWidth  < 1) { g_ViewportX = 0; g_ViewportWidth  = g_PhysicalWidth;  }
+  if (g_ViewportHeight < 1) { g_ViewportY = 0; g_ViewportHeight = g_PhysicalHeight; }
 
   glViewport(g_ViewportX, g_ViewportY, g_ViewportWidth, g_ViewportHeight);
 }
 
 // ── Public C interface ─────────────────────────────────────────────────────────
+void iOSSetSafeArea(int left, int right, int top, int bottom) {
+  g_SafeLeft   = left;
+  g_SafeRight  = right;
+  g_SafeTop    = top;
+  g_SafeBottom = bottom;
+  // If already initialized, reconfigure the viewport live.
+  if (g_Initialized) {
+    ConfigureRenderViewport(g_State.scale);
+    g_State.surface_width  = g_ViewportWidth  / (int)(g_State.scale > 0 ? g_State.scale : 1);
+    g_State.surface_height = g_ViewportHeight / (int)(g_State.scale > 0 ? g_State.scale : 1);
+  }
+}
+
 void iOSInit(void* eagl_layer, int physical_width, int physical_height, float screen_scale, bool is_tablet) {
   if (g_Initialized) return;
 

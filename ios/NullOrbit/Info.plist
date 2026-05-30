@@ -4,9 +4,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>NullOrbit</string>
+    <string>NULLORBIT</string>
     <key>CFBundleDisplayName</key>
-    <string>NullOrbit</string>
+    <string>NULLORBIT</string>
     <key>CFBundleIdentifier</key>
     <string>com.systems.automaton.nullorbit</string>
     <key>CFBundleVersion</key>

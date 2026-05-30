@@ -7,6 +7,11 @@
 @property (nonatomic, strong) GameView*      gameView;
 @property (nonatomic, strong) UIView*        menuView;
 @property (nonatomic, strong) UILabel*       usernameLabel;
+@property (nonatomic, strong) UILabel*       titleLabel;
+@property (nonatomic, strong) UIButton*      resetButton;
+@property (nonatomic, strong) UILabel*       arenaLabel;
+@property (nonatomic, strong) UIButton*      twButton;
+@property (nonatomic, strong) UIButton*      tdmButton;
 @property (nonatomic, strong) CADisplayLink* displayLink;
 @property (nonatomic)         BOOL           gameInitialized;
 @property (nonatomic)         BOOL           requestedLandscapeGeometry;
@@ -31,6 +36,17 @@
     float scale = UIScreen.mainScreen.nativeScale;
     self.gameView.contentScaleFactor = scale;
     ((CAEAGLLayer*)self.gameView.layer).contentsScale = scale;
+
+    // Pass real safe area insets (physical pixels) to the game bridge.
+    // This replaces the old hardcoded 24pt symmetric padding.
+    UIEdgeInsets insets = self.view.safeAreaInsets;
+    iOSSetSafeArea((int)(insets.left   * scale),
+                   (int)(insets.right  * scale),
+                   (int)(insets.top    * scale),
+                   (int)(insets.bottom * scale));
+
+    // Re-layout UIKit menu with current safe area so buttons clear the notch.
+    [self layoutMenuView];
 
     if (!self.gameInitialized &&
         bounds.size.width > 0.0 &&
@@ -116,61 +132,69 @@
 // ── UIKit main menu ──────────────────────────────────────────────────────────
 
 - (void)setupMenuView {
-    CGFloat w = self.view.bounds.size.width;
-    CGFloat h = self.view.bounds.size.height;
-
     UIView* menu = [[UIView alloc] initWithFrame:self.view.bounds];
-    menu.backgroundColor   = [UIColor blackColor];
-    menu.autoresizingMask  = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    menu.backgroundColor  = [UIColor blackColor];
+    menu.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.menuView = menu;
     [self.view addSubview:menu];
 
-    // Title
-    UILabel* title = [[UILabel alloc] initWithFrame:CGRectMake(0, h * 0.08, w, 70)];
-    title.text          = @"NULLORBIT";
-    title.textColor     = [UIColor colorWithRed:0.71 green:0.71 blue:1.0 alpha:1.0];
-    title.font          = [UIFont boldSystemFontOfSize:52];
-    title.textAlignment = NSTextAlignmentCenter;
-    [menu addSubview:title];
+    self.titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,0,0,0)];
+    self.titleLabel.text          = @"NULLORBIT";
+    self.titleLabel.textColor     = [UIColor colorWithRed:0.71 green:0.71 blue:1.0 alpha:1.0];
+    self.titleLabel.font          = [UIFont boldSystemFontOfSize:52];
+    self.titleLabel.textAlignment = NSTextAlignmentCenter;
+    [menu addSubview:self.titleLabel];
 
-    // Username
-    self.usernameLabel = [[UILabel alloc] initWithFrame:CGRectMake(20, h * 0.28, w - 120, 28)];
+    self.usernameLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,0,0,0)];
     self.usernameLabel.textColor     = [UIColor colorWithRed:0.45 green:1.0 blue:0.39 alpha:1.0];
     self.usernameLabel.font          = [UIFont systemFontOfSize:17];
     self.usernameLabel.textAlignment = NSTextAlignmentCenter;
     [menu addSubview:self.usernameLabel];
 
-    // Reset button
-    UIButton* reset = [UIButton buttonWithType:UIButtonTypeSystem];
-    reset.frame = CGRectMake(w - 130, h * 0.28 - 4, 110, 36);
-    [reset setTitle:@"RESET NAME" forState:UIControlStateNormal];
-    [reset setTitleColor:[UIColor colorWithRed:0.87 green:0.19 blue:0.03 alpha:1.0]
-                forState:UIControlStateNormal];
-    reset.layer.borderColor  = [UIColor darkGrayColor].CGColor;
-    reset.layer.borderWidth  = 1;
-    reset.layer.cornerRadius = 6;
-    [reset addTarget:self action:@selector(onReset) forControlEvents:UIControlEventTouchUpInside];
-    [menu addSubview:reset];
+    self.resetButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.resetButton setTitle:@"RESET NAME" forState:UIControlStateNormal];
+    [self.resetButton setTitleColor:[UIColor colorWithRed:0.87 green:0.19 blue:0.03 alpha:1.0]
+                           forState:UIControlStateNormal];
+    self.resetButton.layer.borderColor  = [UIColor darkGrayColor].CGColor;
+    self.resetButton.layer.borderWidth  = 1;
+    self.resetButton.layer.cornerRadius = 6;
+    [self.resetButton addTarget:self action:@selector(onReset) forControlEvents:UIControlEventTouchUpInside];
+    [menu addSubview:self.resetButton];
 
-    // Arena selection label
-    UILabel* arenaLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, h * 0.42, w, 40)];
-    arenaLabel.text          = @"Select an arena";
-    arenaLabel.textColor     = [UIColor colorWithWhite:0.7 alpha:1.0];
-    arenaLabel.font          = [UIFont systemFontOfSize:16];
-    arenaLabel.textAlignment = NSTextAlignmentCenter;
-    [menu addSubview:arenaLabel];
+    self.arenaLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,0,0,0)];
+    self.arenaLabel.text          = @"Select an arena";
+    self.arenaLabel.textColor     = [UIColor colorWithWhite:0.7 alpha:1.0];
+    self.arenaLabel.font          = [UIFont systemFontOfSize:16];
+    self.arenaLabel.textAlignment = NSTextAlignmentCenter;
+    [menu addSubview:self.arenaLabel];
 
-    // Trench Wars CTF
-    UIButton* tw = [self makeMenuButton:@"Trench Wars: Capture the Flag"
-                                  frame:CGRectMake(20, h * 0.50, w - 40, 70)];
-    [tw addTarget:self action:@selector(onJoinTW) forControlEvents:UIControlEventTouchUpInside];
-    [menu addSubview:tw];
+    self.twButton = [self makeMenuButton:@"Trench Wars: Capture the Flag" frame:CGRectMake(0,0,0,0)];
+    [self.twButton addTarget:self action:@selector(onJoinTW) forControlEvents:UIControlEventTouchUpInside];
+    [menu addSubview:self.twButton];
 
-    // Team Deathmatch
-    UIButton* tdm = [self makeMenuButton:@"Team Deathmatch"
-                                   frame:CGRectMake(20, h * 0.50 + 90, w - 40, 70)];
-    [tdm addTarget:self action:@selector(onJoinTDM) forControlEvents:UIControlEventTouchUpInside];
-    [menu addSubview:tdm];
+    self.tdmButton = [self makeMenuButton:@"Team Deathmatch" frame:CGRectMake(0,0,0,0)];
+    [self.tdmButton addTarget:self action:@selector(onJoinTDM) forControlEvents:UIControlEventTouchUpInside];
+    [menu addSubview:self.tdmButton];
+}
+
+// Recomputes all menu frames using current safe area insets. Called from viewDidLayoutSubviews.
+- (void)layoutMenuView {
+    CGFloat w = self.menuView.bounds.size.width;
+    CGFloat h = self.menuView.bounds.size.height;
+    UIEdgeInsets insets = self.view.safeAreaInsets;
+
+    // Safe horizontal origin and usable width, with a small minimum margin.
+    CGFloat marginH = MAX(insets.left, 8.0);
+    CGFloat marginR = MAX(insets.right, 8.0);
+    CGFloat ox = marginH;               // left edge of usable area
+    CGFloat uw = w - marginH - marginR; // usable width
+
+    self.titleLabel.frame      = CGRectMake(ox, h * 0.08, uw, 70);
+    self.usernameLabel.frame   = CGRectMake(ox + 20, h * 0.28, uw - 130, 28);
+    self.resetButton.frame     = CGRectMake(ox + uw - 120, h * 0.28 - 4, 110, 36);
+    self.arenaLabel.frame      = CGRectMake(ox, h * 0.42, uw, 40);
+    self.twButton.frame        = CGRectMake(ox + 20, h * 0.50, uw - 40, 70);
+    self.tdmButton.frame       = CGRectMake(ox + 20, h * 0.50 + 90, uw - 40, 70);
 }
 
 - (UIButton*)makeMenuButton:(NSString*)title frame:(CGRect)frame {
