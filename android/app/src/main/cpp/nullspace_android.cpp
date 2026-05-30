@@ -775,8 +775,8 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
 
       if (self) {
         // Check ALL active pointers for weapon button presses (multi-touch support)
-        // Don't process game input when menu is open
-        if (!game->menu_open && self->ship < 8 && (flags == AMOTION_EVENT_ACTION_MOVE || flags == AMOTION_EVENT_ACTION_POINTER_DOWN || flags == AMOTION_EVENT_ACTION_DOWN)) {
+        // Don't process game input when menu is open or scoreboard is showing
+        if (!game->menu_open && !game->show_all_statboxes && self->ship < 8 && (flags == AMOTION_EVENT_ACTION_MOVE || flags == AMOTION_EVENT_ACTION_POINTER_DOWN || flags == AMOTION_EVENT_ACTION_DOWN)) {
           bool gun_pressed = false;
           bool bomb_pressed = false;
           

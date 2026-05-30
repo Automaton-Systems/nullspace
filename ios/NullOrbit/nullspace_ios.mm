@@ -668,8 +668,8 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
   bool owns_right = (ios_input.right_ptr == pointer_id);
 
   // ── Fire / ability buttons (right-slot pointer only) ──────────────────────
-  // Don't process game input when menu is open
-  if (!game->menu_open && self->ship < 8 && owns_right &&
+  // Don't process game input when menu is open or scoreboard is showing
+  if (!game->menu_open && !game->show_all_statboxes && self->ship < 8 && owns_right &&
       (flags == AMOTION_MOVE || flags == AMOTION_DOWN || flags == AMOTION_POINTER_DOWN)) {
     float button_size   = 72.0f;
     float button_radius = button_size / 2.0f;
@@ -733,9 +733,9 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
   }
 
   // ── Bottom ability icons (right-slot pointer only) ────────────────────────
-  // Don't process game input when menu is open
+  // Don't process game input when menu is open or scoreboard is showing
   // One-shot taps are latched until the next frame so quick presses aren't lost.
-  if (!game->menu_open && self->ship < 8 && owns_right &&
+  if (!game->menu_open && !game->show_all_statboxes && self->ship < 8 && owns_right &&
       flags == AMOTION_DOWN && !ios_input.abilities_triggered) {
     float ability_y = lh;  // At screen bottom
     float ability_x_start = lw - 250.0f;  // Slightly more left for margin
