@@ -149,6 +149,13 @@ android/app/build/outputs/apk/release/app-release.apk
 - Set `JAVA_HOME` to Java 17+ before running gradlew
 - Android Studio's bundled JDK works well
 
+**Android Logging in C++ Code:**
+- Always use `__android_log_print()` for logging in C++ files on Android
+- Standard `Log()` function doesn't output to Android logcat
+- Include: `#include <android/log.h>`
+- Example: `__android_log_print(ANDROID_LOG_INFO, "nullspace", "Message: %d", value);`
+- Wrap in `#ifdef __ANDROID__` for cross-platform compatibility
+
 ### Touch Controls
 
 The Android version is spectator-only (no ship controls):
