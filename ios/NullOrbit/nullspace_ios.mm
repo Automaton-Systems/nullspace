@@ -860,8 +860,80 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
       }
     } else {
       bool is_top_ui = (logical_y < 80.0f) && is_tap;
-      if (is_top_ui && dur < LONG_PRESS_TIMEOUT)
+      if (is_top_ui && dur < LONG_PRESS_TIMEOUT) {
         g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+      }
+      // Spectator mode tap handling
+      else if (self->ship == 8 && is_tap && dur < LONG_PRESS_TIMEOUT) {
+        // Check if tap is on xradar icon (bottom-right area, 26x25px icon at y = height - 35)
+        float xradar_x = lw - 26.0f;
+        float xradar_y = lh - 35.0f;
+        float xradar_width = 26.0f;
+        float xradar_height = 25.0f;
+        
+        if (logical_x >= xradar_x && logical_x <= lw &&
+            logical_y >= xradar_y && logical_y <= xradar_y + xradar_height) {
+          // Toggle xradar
+          if (g_InputState.action_callback) {
+            g_InputState.action_callback(g_InputState.user, null::InputAction::XRadar);
+          }
+        } else {
+          // Tap elsewhere - follow nearby player or cycle to next
+          null::Vector2f world_pos(self->position.x + nx * (game->ui_camera.surface_dim.x * (1.0f / 16.0f)),
+                                   self->position.y + ny * (game->ui_camera.surface_dim.y * (1.0f / 16.0f)));
+          
+          // Find nearby player to spectate
+          null::Player* closest = nullptr;
+          float closest_dist = 10000.0f;
+          
+          for (size_t i = 0; i < game->player_manager.player_count; ++i) {
+            null::Player* player = game->player_manager.players + i;
+            
+            if (player->ship == 8) continue;
+            
+            float dist_sq = player->position.DistanceSq(world_pos);
+            if (dist_sq < closest_dist) {
+              closest_dist = dist_sq;
+              closest = player;
+            }
+          }
+          
+          // If tap is near a player (within 4 tiles), follow that player
+          if (closest && closest_dist <= 4.0f * 4.0f) {
+            game->specview.spectate_id = closest->id;
+            game->specview.spectate_frequency = closest->frequency;
+          } else {
+            // Otherwise, cycle to next player in the list
+            u16 current_id = game->specview.spectate_id;
+            
+            // Find current player's index in the player array
+            size_t current_index = 0;
+            bool found_current = false;
+            if (current_id != null::kInvalidSpectateId) {
+              for (size_t i = 0; i < game->player_manager.player_count; ++i) {
+                if (game->player_manager.players[i].id == current_id) {
+                  current_index = i;
+                  found_current = true;
+                  break;
+                }
+              }
+            }
+            
+            // Start search from next player (or first player if not following anyone)
+            size_t start_index = found_current ? (current_index + 1) : 0;
+            
+            // Search through all players, wrapping around
+            for (size_t offset = 0; offset < game->player_manager.player_count; ++offset) {
+              size_t i = (start_index + offset) % game->player_manager.player_count;
+              null::Player* player = game->player_manager.players + i;
+              if (player->ship == 8) continue;  // Skip spectators
+              game->specview.spectate_id = player->id;
+              game->specview.spectate_frequency = player->frequency;
+              break;
+            }
+          }
+        }
+      }
     }
 
     ios_input.last_tap_time = now_ns();
@@ -883,30 +955,10 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
       float oy = (ios_input.ny - ny) * (game->ui_camera.surface_dim.y * (1.0f/16.0f));
       self->position.x = ios_input.world_x + ox;
       self->position.y = ios_input.world_y + oy;
+      
+      // If dragging significantly, exit follow mode
       if (fabsf(ox) > 1.0f || fabsf(oy) > 1.0f)
         game->specview.spectate_id = null::kInvalidSpectateId;
-
-      int64_t now = now_ns();
-      if (now - ios_input.last_tap_time <= DOUBLE_TAP_TIMEOUT) {
-        float dtx = x - ios_input.last_tap_x;
-        float dty = y - ios_input.last_tap_y;
-        if (dtx*dtx + dty*dty < DOUBLE_TAP_SLOP*DOUBLE_TAP_SLOP) {
-          null::Vector2f wp(self->position.x + nx*(game->ui_camera.surface_dim.x*(1.0f/16.0f)),
-                            self->position.y + ny*(game->ui_camera.surface_dim.y*(1.0f/16.0f)));
-          null::Player* closest = nullptr;
-          float closest_d = 10000.0f;
-          for (size_t i = 0; i < game->player_manager.player_count; ++i) {
-            null::Player* p = game->player_manager.players + i;
-            if (p->ship == 8) continue;
-            float d = p->position.DistanceSq(wp);
-            if (d < closest_d) { closest_d = d; closest = p; }
-          }
-          if (closest && closest_d <= 16.0f) {
-            game->specview.spectate_id        = closest->id;
-            game->specview.spectate_frequency = closest->frequency;
-          }
-        }
-      }
     } else if (owns_left) {
       // Joystick movement: only the left-slot pointer drives the dpad
       // Match Android positioning: 20px from left and 20px from bottom

@@ -1083,6 +1083,82 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
               null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
               handled_menu_interaction = true;
             }
+            // Spectator mode tap handling
+            else if (self->ship == 8 && is_tap && touch_duration < LONG_PRESS_TIMEOUT) {
+              float logical_screen_width = (float)null::g_nullspace.surface_width;
+              float logical_screen_height = (float)null::g_nullspace.surface_height;
+              
+              // Check if tap is on xradar icon (bottom-right area, 26x25px icon at y = height - 35)
+              float xradar_x = logical_screen_width - 26.0f;
+              float xradar_y = logical_screen_height - 35.0f;
+              float xradar_width = 26.0f;
+              float xradar_height = 25.0f;
+              
+              if (logical_x >= xradar_x && logical_x <= logical_screen_width &&
+                  logical_y >= xradar_y && logical_y <= xradar_y + xradar_height) {
+                // Toggle xradar
+                if (null::g_InputState.action_callback) {
+                  null::g_InputState.action_callback(null::g_InputState.user, null::InputAction::XRadar);
+                }
+              } else {
+                // Tap elsewhere - follow nearby player or cycle to next
+                null::Vector2f world_pos(self->position.x + nx * (game->ui_camera.surface_dim.x * (1.0f / 16.0f)),
+                                         self->position.y + ny * (game->ui_camera.surface_dim.y * (1.0f / 16.0f)));
+                
+                // Find nearby player to spectate
+                null::Player* closest = nullptr;
+                float closest_dist = 10000.0f;
+                
+                for (size_t i = 0; i < game->player_manager.player_count; ++i) {
+                  null::Player* player = game->player_manager.players + i;
+                  
+                  if (player->ship == 8) continue;
+                  
+                  float dist_sq = player->position.DistanceSq(world_pos);
+                  if (dist_sq < closest_dist) {
+                    closest_dist = dist_sq;
+                    closest = player;
+                  }
+                }
+                
+                // If tap is near a player (within 4 tiles), follow that player
+                if (closest && closest_dist <= 4.0f * 4.0f) {
+                  game->specview.spectate_id = closest->id;
+                  game->specview.spectate_frequency = closest->frequency;
+                } else {
+                  // Otherwise, cycle to next player in the list
+                  null::u16 current_id = game->specview.spectate_id;
+                  
+                  // Find current player's index in the player array
+                  size_t current_index = 0;
+                  bool found_current = false;
+                  if (current_id != null::kInvalidSpectateId) {
+                    for (size_t i = 0; i < game->player_manager.player_count; ++i) {
+                      if (game->player_manager.players[i].id == current_id) {
+                        current_index = i;
+                        found_current = true;
+                        break;
+                      }
+                    }
+                  }
+                  
+                  // Start search from next player (or first player if not following anyone)
+                  size_t start_index = found_current ? (current_index + 1) : 0;
+                  
+                  // Search through all players, wrapping around
+                  bool found_next = false;
+                  for (size_t offset = 0; offset < game->player_manager.player_count; ++offset) {
+                    size_t i = (start_index + offset) % game->player_manager.player_count;
+                    null::Player* player = game->player_manager.players + i;
+                    if (player->ship == 8) continue;  // Skip spectators
+                    game->specview.spectate_id = player->id;
+                    game->specview.spectate_frequency = player->frequency;
+                    found_next = true;
+                    break;
+                  }
+                }
+              }
+            }
             // Ability buttons are handled via multi-touch above
             // Tap-to-shoot disabled for now - was causing bullet to get stuck
             // Can re-enable later with better implementation
@@ -1111,40 +1187,9 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             self->position.x = android_input.world_x + offset_x;
             self->position.y = android_input.world_y + offset_y;
 
+            // If dragging significantly, exit follow mode
             if (abs(offset_x) > 1.0f || abs(offset_y) > 1.0f) {
               game->specview.spectate_id = null::kInvalidSpectateId;
-            }
-
-            int64_t eventTime = AMotionEvent_getEventTime(inputEvent);
-            if (eventTime - android_input.last_tap_time <= DOUBLE_TAP_TIMEOUT) {
-              float dx = x - android_input.last_tap_x;
-              float dy = y - android_input.last_tap_y;
-
-              if (dx * dx + dy * dy < DOUBLE_TAP_SLOP * DOUBLE_TAP_SLOP) {
-                null::Vector2f world_pos(self->position.x + nx * (game->ui_camera.surface_dim.x * (1.0f / 16.0f)),
-                                         self->position.y + ny * (game->ui_camera.surface_dim.y * (1.0f / 16.0f)));
-
-                // Find nearby player to spectate
-                null::Player* closest = nullptr;
-                float closest_dist = 10000.0f;
-
-                for (size_t i = 0; i < game->player_manager.player_count; ++i) {
-                  null::Player* player = game->player_manager.players + i;
-
-                  if (player->ship == 8) continue;
-
-                  float dist_sq = player->position.DistanceSq(world_pos);
-                  if (dist_sq < closest_dist) {
-                    closest_dist = dist_sq;
-                    closest = player;
-                  }
-                }
-
-                if (closest && closest_dist <= 4.0f * 4.0f) {
-                  game->specview.spectate_id = closest->id;
-                  game->specview.spectate_frequency = closest->frequency;
-                }
-              }
             }
           } else {
             // Ship mode: Virtual D-Pad in bottom-left for flying
