@@ -803,7 +803,7 @@ void Game::RenderGame(float dt) {
     statbox.view_type = StatViewType::Frequency;
     statbox.rebuild = true;
     Vector2f freq_offset(right_x - 3, start_y - 3);
-    sprite_renderer.DrawText(ui_camera, "Frequency", TextColor::White,
+    sprite_renderer.DrawText(ui_camera, "Team", TextColor::White,
                             Vector2f(right_x + 80, label_y), Layer::TopMost, TextAlignment::Center);
     statbox.Render(ui_camera, sprite_renderer, freq_offset);
     
@@ -1133,7 +1133,7 @@ void Game::OnFlagVictory(u8* pkt, size_t size) {
     notifications.PushFormatted(TextColor::Green, "VICTORY! Your team won %d points!", points);
     sound_system.Play(AudioType::Flag);
   } else {
-    notifications.PushFormatted(TextColor::Yellow, "Freq %d won %d points.", freq, points);
+    notifications.PushFormatted(TextColor::Yellow, "Team %d won %d points.", freq, points);
   }
 }
 

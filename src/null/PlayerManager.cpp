@@ -1377,7 +1377,7 @@ void PlayerManager::AttachSelf(Player* destination) {
   }
 
   if (self->frequency != destination->frequency) {
-    notifications->PushFormatted(TextColor::Yellow, "Must attach to somebody of same frequency.");
+    notifications->PushFormatted(TextColor::Yellow, "Must attach to somebody of same team.");
     return;
   }
 

@@ -496,7 +496,7 @@ void StatBox::RecordFrequencyView(const Player& me) {
 
   StatTextOutput* header_freq_output =
       AddTextOutput(Vector2f(freq_x, kBorder + 1), TextColor::Green, TextAlignment::Right);
-  sprintf(header_freq_output->text, "Freq");
+  sprintf(header_freq_output->text, "Team");
 
   StatTextOutput* header_points_output =
       AddTextOutput(Vector2f(points_x, kBorder + 1), TextColor::Green, TextAlignment::Right);
