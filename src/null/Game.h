@@ -86,6 +86,8 @@ struct Game {
   bool menu_quit = false;
 #ifdef NULLSPACE_MOBILE
   bool show_all_statboxes = false;
+  bool onboarding_was_active = false;
+  bool should_open_menu_after_wizard = false;
 #endif
   int mapzoom = 0;
   float jitter_time = 0.0f;

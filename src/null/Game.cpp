@@ -399,13 +399,30 @@ bool Game::Update(const InputState& input, float dt) {
 #ifdef __ANDROID__
     if (!g_AndroidSettings.wizard_shown) {
       onboarding.Show();
+      should_open_menu_after_wizard = true;
+    } else {
+      // Open menu immediately if user has already seen wizard
+      menu_open = true;
     }
 #elif defined(NULLSPACE_MOBILE)
     if (!g_IOSSettings.wizard_shown) {
       onboarding.Show();
+      should_open_menu_after_wizard = true;
+    } else {
+      // Open menu immediately if user has already seen wizard
+      menu_open = true;
     }
 #endif
   }
+
+#ifdef NULLSPACE_MOBILE
+  // Auto-open menu after first-time wizard closes
+  if (should_open_menu_after_wizard && onboarding_was_active && !onboarding.IsActive()) {
+    menu_open = true;
+    should_open_menu_after_wizard = false;
+  }
+  onboarding_was_active = onboarding.IsActive();
+#endif
 
   // This must be updated after position update
   if (specview.Update(input, dt)) {
