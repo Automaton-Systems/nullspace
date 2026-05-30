@@ -16,30 +16,31 @@ void Game::RenderMenuAndroid() {
                                   "Weasel", "Lancaster", "Shark",
                                   "Spectator"};
 
-  Vector2f dimensions(620.0f, 340.0f);
+  // Full screen menu (100% of screen)
+  Vector2f dimensions = ui_camera.surface_dim;
   Vector2f half_dimensions = dimensions * 0.5f;
-  Vector2f topleft((ui_camera.surface_dim.x - dimensions.x) * 0.5f, 3);
+  Vector2f topleft(0, 0);
 
   SpriteRenderable background = Graphics::GetColor(ColorType::Background, dimensions);
   sprite_renderer.Draw(ui_camera, background, topleft, Layer::TopMost);
 
   SpriteRenderable separator = Graphics::GetColor(ColorType::Border1, Vector2f(dimensions.x, 1));
-  sprite_renderer.Draw(ui_camera, separator, topleft + Vector2f(0, 13), Layer::TopMost);
+  sprite_renderer.Draw(ui_camera, separator, topleft + Vector2f(0, 20), Layer::TopMost);
   Graphics::DrawBorder(sprite_renderer, ui_camera, topleft + half_dimensions, half_dimensions);
 
-  sprite_renderer.DrawText(ui_camera, "-= Menu =-", TextColor::Green, Vector2f(topleft.x + half_dimensions.x, 4),
+  sprite_renderer.DrawText(ui_camera, "-= Menu =-", TextColor::Green, Vector2f(half_dimensions.x, 4),
                            Layer::TopMost, TextAlignment::Center);
 
-  // Left side - ship selection grid with sprites
-  float grid_start_x = topleft.x + 10.0f;
-  float grid_y = topleft.y + 40.0f;
+  // Left side - ship selection grid with sprites (positioned from left edge)
+  float grid_start_x = 20.0f;
+  float grid_y = 78.0f;
   float cell_width = 110.0f;
   float cell_height = 70.0f;
   float grid_spacing = 8.0f;
   float total_grid_width = 3 * cell_width + 2 * grid_spacing;
 
-  sprite_renderer.DrawText(ui_camera, "Ships", TextColor::DarkRed,
-                           Vector2f(grid_start_x + total_grid_width * 0.5f, 20.0f),
+  sprite_renderer.DrawText(ui_camera, "Select Ship", TextColor::DarkRed,
+                           Vector2f(grid_start_x + total_grid_width * 0.5f, 44.0f),
                            Layer::TopMost, TextAlignment::Center);
 
   for (size_t i = 0; i < NULLSPACE_ARRAY_SIZE(kLeftMenuText); ++i) {
@@ -67,15 +68,16 @@ void Game::RenderMenuAndroid() {
                              Layer::TopMost, TextAlignment::Center);
   }
 
-  // Right column - simplified menu buttons
+  // Right column - menu buttons (positioned from right edge)
   float button_width = 140.0f;
   float button_height = 35.0f;
-  float right_column_x = topleft.x + dimensions.x - button_width - 10.0f;
-  float y = 20.0f;
+  float button_margin = 20.0f;
+  float right_column_x = dimensions.x - button_width - button_margin;
+  float y = 30.0f;
 
   for (size_t i = 0; i < NULLSPACE_ARRAY_SIZE(kRightMenuText); ++i) {
     Vector2f button_size(button_width, button_height);
-    Vector2f button_pos(right_column_x, topleft.y + y);
+    Vector2f button_pos(right_column_x, y);
 
     Graphics::DrawBorder(sprite_renderer, ui_camera, button_pos + button_size * 0.5f, button_size * 0.5f);
     sprite_renderer.DrawText(ui_camera, kRightMenuText[i], TextColor::White,
@@ -84,6 +86,15 @@ void Game::RenderMenuAndroid() {
 
     y += button_height + 8.0f;
   }
+
+  // CLOSE button at bottom right corner
+  Vector2f close_button_size(button_width, button_height);
+  Vector2f close_button_pos(right_column_x, dimensions.y - button_height - button_margin);
+  
+  Graphics::DrawBorder(sprite_renderer, ui_camera, close_button_pos + close_button_size * 0.5f, close_button_size * 0.5f);
+  sprite_renderer.DrawText(ui_camera, "CLOSE", TextColor::White,
+                           Vector2f(close_button_pos.x + close_button_size.x * 0.5f, close_button_pos.y + 10),
+                           Layer::TopMost, TextAlignment::Center);
 
   sprite_renderer.Render(ui_camera);
 }

@@ -746,16 +746,18 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
     } else if (game->show_all_statboxes && is_tap) {
       game->show_all_statboxes = false;
     } else if (game->menu_open && is_tap) {
-      float menu_w = 620.0f, menu_h = 340.0f;
-      float menu_x = (lw - menu_w) * 0.5f, menu_y = 3.0f;
+      // Full screen menu (100% of screen)
+      float menu_w = lw, menu_h = lh;
+      float menu_x = 0.0f, menu_y = 0.0f;
 
       // Left side - ship selection grid
-      float gsx = menu_x + 10.0f, gsy = menu_y + 40.0f;
+      float gsx = 20.0f, gsy = 78.0f;
       float cw = 110.0f, ch = 70.0f, gs = 8.0f;
 
       // Right column - Scoreboard, Help, Quit
       float rbw = 140.0f, rbh = 35.0f;
-      float rcx = menu_x + menu_w - rbw - 10.0f, rsy = menu_y + 20.0f;
+      float button_margin = 20.0f;
+      float rcx = menu_w - rbw - button_margin, rsy = 30.0f;
 
       bool handled = false;
 
@@ -781,10 +783,14 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
         else if (bi == 2) { g_InputState.OnCharacter('q'); }
         handled = true;
       }
-      if (!handled) {
-        if (!(logical_x>=menu_x && logical_x<=menu_x+menu_w &&
-              logical_y>=menu_y && logical_y<=menu_y+menu_h))
-          g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+      // Check CLOSE button at bottom right
+      float close_x = rcx;
+      float close_y = menu_h - rbh - button_margin;
+      if (!handled &&
+          logical_x >= close_x && logical_x <= close_x + rbw &&
+          logical_y >= close_y && logical_y <= close_y + rbh) {
+        g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+        handled = true;
       }
     } else {
       bool is_top_ui = (logical_y < 80.0f) && is_tap;

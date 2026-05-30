@@ -318,31 +318,33 @@ struct nullspace {
       float username_y = io.DisplaySize.y * 0.28f;
       ImGui::SetCursorPosY(username_y);
       
-      // Player label and username on same line in center
+      // Player label and username centered
       ImGui::SetWindowFontScale(1.7f);
       float player_text_width = ImGui::CalcTextSize("Player: ").x;
       float name_width = ImGui::CalcTextSize(name).x;
       float total_width = player_text_width + name_width;
-      ImGui::SetCursorPosX(center_x - total_width * 0.5f - 60.0f);  // Offset left for RESET button space
+      ImGui::SetCursorPosX(center_x - total_width * 0.5f);
       
       ImGui::TextColored(ImVec4(0.451f, 1.0f, 0.388f, 1.0f), "Player: %s", name);  // Neon green
       ImGui::SetWindowFontScale(1.0f);
       
-      // RESET button on same line
-      ImGui::SameLine();
-      ImGui::SetWindowFontScale(1.3f);
+      // RESET button on far right (matching EMU button height: 100, triple width: 300)
+      float reset_width = 300.0f;
+      float reset_height = 100.0f;
+      ImGui::SetCursorPos(ImVec2(io.DisplaySize.x - reset_width - 20.0f, username_y));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.871f, 0.192f, 0.031f, 1.0f));  // Red #DE3108
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
-      if (ImGui::Button("RESET", ImVec2(120, 40))) {
+      ImGui::SetWindowFontScale(1.5f);  // Larger font for bigger button
+      if (ImGui::Button("RESET", ImVec2(reset_width, reset_height))) {
         std::string new_name = GenerateRandomUsername();
         snprintf(name, sizeof(name), "%s", new_name.c_str());
         g_AndroidSettings.SetUsername(new_name);
       }
+      ImGui::SetWindowFontScale(1.0f);  // Reset font scale
       ImGui::PopStyleColor(2);
       ImGui::PopStyleVar(2);
-      ImGui::SetWindowFontScale(1.0f);
       
       // GAME MODE BUTTONS: at 45% down (matching iOS)
       float buttons_y = io.DisplaySize.y * 0.45f;
@@ -939,25 +941,27 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
           else if (game->menu_open && is_tap) {
             handled_menu_interaction = true;
             
-            // Menu dimensions: 620x340, top at y=3 (in logical space)
-            float menu_width = 620.0f;
-            float menu_height = 340.0f;
+            // Full screen menu (100% of screen)
             float logical_screen_width = (float)null::g_nullspace.surface_width;
-            float menu_x = (logical_screen_width - menu_width) * 0.5f;
-            float menu_y = 3.0f;
+            float logical_screen_height = (float)null::g_nullspace.surface_height;
+            float menu_width = logical_screen_width;
+            float menu_height = logical_screen_height;
+            float menu_x = 0.0f;
+            float menu_y = 0.0f;
             
             // Left side ship grid
-            float grid_start_x = menu_x + 10.0f;
-            float grid_start_y = menu_y + 40.0f;
+            float grid_start_x = 20.0f;
+            float grid_start_y = 78.0f;
             float cell_width = 110.0f;
             float cell_height = 70.0f;
             float grid_spacing = 8.0f;
             
-            // Right column (Scoreboard, Help, Quit)
+            // Right column buttons (Scoreboard, Help, Quit)
             float right_button_width = 140.0f;
             float right_button_height = 35.0f;
-            float right_column_x = menu_x + menu_width - right_button_width - 10.0f;
-            float right_start_y = menu_y + 20.0f;
+            float button_margin = 20.0f;
+            float right_column_x = menu_width - right_button_width - button_margin;
+            float right_start_y = 30.0f;
             
             bool handled_click = false;
             
@@ -985,7 +989,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
               }
             }
             
-            // Check right column buttons
+            // Check right column buttons (Scoreboard, Help, Quit)
             if (!handled_click && logical_x >= right_column_x && logical_x <= right_column_x + right_button_width &&
                 logical_y >= right_start_y && logical_y <= right_start_y + 3 * (right_button_height + 8.0f)) {
               float relative_y = logical_y - right_start_y;
@@ -1008,16 +1012,15 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
               }
             }
             
-            // If click is anywhere else in menu but not handled, keep menu open
-            // If click outside menu, close it
-            if (!handled_click) {
-              if (logical_x >= menu_x && logical_x <= menu_x + menu_width &&
-                  logical_y >= menu_y && logical_y <= menu_y + menu_height) {
-                // Click inside menu but not on a working button - do nothing (keep menu open)
-              } else {
-                // Click outside menu - close it
-                null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
-              }
+            // Check CLOSE button at bottom right
+            float close_button_x = right_column_x;
+            float close_button_y = menu_height - right_button_height - button_margin;
+            
+            if (!handled_click && logical_x >= close_button_x && logical_x <= close_button_x + right_button_width &&
+                logical_y >= close_button_y && logical_y <= close_button_y + right_button_height) {
+              // Close menu
+              null::g_InputState.OnCharacter(NULLSPACE_KEY_ESCAPE);
+              handled_click = true;
             }
           } else {
             android_input.last_tap_time = AMotionEvent_getEventTime(inputEvent);
