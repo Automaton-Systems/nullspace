@@ -936,7 +936,7 @@ bool Game::HandleMenuKey(int codepoint, int mods) {
       Player* self = player_manager.GetSelf();
 
       if (self && self->ship != ship) {
-        if (self->ship != 8 && self->energy < ship_controller.ship.energy) {
+        if (self->ship != 8 && self->energy < (float)ship_controller.ship.energy - 1.0f) {
           notifications.PushFormatted(TextColor::Yellow, "Must have full energy to change ship types.");
         } else {
           Log(LogLevel::Info, "Sending ship request for %d", ship + 1);
@@ -950,7 +950,7 @@ bool Game::HandleMenuKey(int codepoint, int mods) {
       Player* self = player_manager.GetSelf();
 
       if (self && self->ship != 8) {
-        if (self->energy < ship_controller.ship.energy) {
+        if (self->energy < (float)ship_controller.ship.energy - 1.0f) {
           notifications.PushFormatted(TextColor::Yellow, "Must have full energy to change to spectator mode.");
         } else {
           Log(LogLevel::Info, "Sending spectate request.");
