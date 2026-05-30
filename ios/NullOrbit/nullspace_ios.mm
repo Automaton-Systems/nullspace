@@ -161,7 +161,7 @@ struct nullspace_ios_state {
   char name[20]     = {};
   char password[20] = {};
   GameScreen screen = GameScreen::MainMenu;
-  float frame_time  = 0.0f;
+  int64_t last_frame_ns = 0;
   float scale       = 1.0f;
 
   std::string GenerateRandomUsername() {
@@ -247,6 +247,7 @@ struct nullspace_ios_state {
       return false;
     }
 
+    last_frame_ns = now_ns();
     screen = GameScreen::Playing;
     game->connection.SendEncryptionRequest(null::g_Settings.encrypt_method);
     return true;
@@ -255,10 +256,15 @@ struct nullspace_ios_state {
   bool Update() {
     constexpr float kMaxDelta = 1.0f / 20.0f;
 
-    using ms_float = std::chrono::duration<float, std::milli>;
-    auto start = std::chrono::high_resolution_clock::now();
+    int64_t current_ns = now_ns();
+    float dt = 1.0f / 60.0f;
 
-    float dt = frame_time / 1000.0f;
+    if (last_frame_ns != 0) {
+      dt = (float)(current_ns - last_frame_ns) / 1000000000.0f;
+    }
+
+    last_frame_ns = current_ns;
+
     if (dt > kMaxDelta) dt = kMaxDelta;
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -271,6 +277,7 @@ struct nullspace_ios_state {
         glUseProgram(0);
         screen = GameScreen::MainMenu;
         game->Cleanup();
+        last_frame_ns = 0;
         // Notify ViewController to re-show menu (done by polling iOSIsInGame())
         return true;
       }
@@ -282,9 +289,6 @@ struct nullspace_ios_state {
     // Present to screen
     glBindRenderbuffer(GL_RENDERBUFFER, g_ColorRB);
     [g_Context presentRenderbuffer:GL_RENDERBUFFER];
-
-    auto end = std::chrono::high_resolution_clock::now();
-    frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
 
     trans_arena.Reset();
     return true;

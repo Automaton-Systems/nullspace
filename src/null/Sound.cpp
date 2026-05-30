@@ -90,7 +90,7 @@ SoundSystem::SoundSystem(MemoryArena& perm_arena) : database(perm_arena), initia
 
   cfg_device.playback.format = SOUND_SAMPLE_FORMAT;
   cfg_device.playback.channels = SOUND_CHANNEL_COUNT;
-  cfg_device.sampleRate = SOUND_SAMPLE_RATE;
+  cfg_device.sampleRate = 0;
   cfg_device.dataCallback = data_callback;
   cfg_device.pUserData = this;
 }
@@ -99,6 +99,8 @@ bool SoundSystem::Initialize() {
   if (ma_device_init(NULL, &cfg_device, &device) != MA_SUCCESS) {
     return false;
   }
+
+  cfg_decoder = ma_decoder_config_init(device.playback.format, device.playback.channels, device.sampleRate);
 
   if (ma_device_start(&device) != MA_SUCCESS) {
     ma_device_uninit(&device);

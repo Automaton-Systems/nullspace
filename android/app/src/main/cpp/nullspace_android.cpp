@@ -151,7 +151,7 @@ struct nullspace {
   char name[20];
   char password[20];
   GameScreen screen = GameScreen::MainMenu;
-  float frame_time = 0.0f;
+  std::chrono::steady_clock::time_point last_frame_time = {};
   float scale = 1.0f;
 
   size_t selected_zone_index = 0;
@@ -402,10 +402,14 @@ struct nullspace {
   bool Update() {
     constexpr float kMaxDelta = 1.0f / 20.0f;
 
-    using ms_float = std::chrono::duration<float, std::milli>;
-    auto start = std::chrono::high_resolution_clock::now();
+    auto current_frame_time = std::chrono::steady_clock::now();
+    float dt = 1.0f / 60.0f;
 
-    float dt = frame_time / 1000.0f;
+    if (last_frame_time != std::chrono::steady_clock::time_point{}) {
+      dt = std::chrono::duration<float>(current_frame_time - last_frame_time).count();
+    }
+
+    last_frame_time = current_frame_time;
 
     // Cap dt so window movement doesn't cause large updates
     if (dt > kMaxDelta) {
@@ -441,9 +445,6 @@ struct nullspace {
         destroySurfaceOnly();
       }
     }
-
-    auto end = std::chrono::high_resolution_clock::now();
-    frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
 
     trans_arena.Reset();
     return true;

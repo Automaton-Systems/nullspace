@@ -754,6 +754,8 @@ void PlayerManager::OnPlayerDeath(u8* pkt, size_t size) {
     killed->ball_carrier = false;
     ++killed->losses;
 
+    weapon_manager->ClearWeapons(*killed);
+
     DetachPlayer(*killed);
     DetachAllChildren(*killed);
 

@@ -363,15 +363,17 @@ struct nullspace {
 
   void Run() {
     constexpr float kMaxDelta = 1.0f / 20.0f;
-
-    // TODO: better timer
-    using ms_float = std::chrono::duration<float, std::milli>;
-    float frame_time = 0.0f;
+    auto last_frame_time = std::chrono::steady_clock::time_point{};
 
     while (true) {
-      auto start = std::chrono::high_resolution_clock::now();
+      auto current_frame_time = std::chrono::steady_clock::now();
+      float dt = 1.0f / 60.0f;
 
-      float dt = frame_time / 1000.0f;
+      if (last_frame_time != std::chrono::steady_clock::time_point{}) {
+        dt = std::chrono::duration<float>(current_frame_time - last_frame_time).count();
+      }
+
+      last_frame_time = current_frame_time;
 
       // Cap dt so window movement doesn't cause large updates
       if (dt > kMaxDelta) {
@@ -405,9 +407,6 @@ struct nullspace {
       if (glfwWindowShouldClose(window)) {
         break;
       }
-
-      auto end = std::chrono::high_resolution_clock::now();
-      frame_time = std::chrono::duration_cast<ms_float>(end - start).count();
 
       trans_arena.Reset();
     }
