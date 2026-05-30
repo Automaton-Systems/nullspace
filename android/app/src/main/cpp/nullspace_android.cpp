@@ -328,8 +328,8 @@ struct nullspace {
       ImGui::TextColored(ImVec4(0.451f, 1.0f, 0.388f, 1.0f), "Player: %s", name);  // Neon green
       ImGui::SetWindowFontScale(1.0f);
       
-      // RESET button on far right (matching EMU button height: 100, triple width: 300)
-      float reset_width = 300.0f;
+      // RESET button on far right (wider to fit "RESET NAME" text)
+      float reset_width = 380.0f;
       float reset_height = 100.0f;
       ImGui::SetCursorPos(ImVec2(io.DisplaySize.x - reset_width - 20.0f, username_y));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6.0f);
@@ -337,7 +337,7 @@ struct nullspace {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.871f, 0.192f, 0.031f, 1.0f));  // Red #DE3108
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
       ImGui::SetWindowFontScale(1.5f);  // Larger font for bigger button
-      if (ImGui::Button("RESET", ImVec2(reset_width, reset_height))) {
+      if (ImGui::Button("RESET NAME", ImVec2(reset_width, reset_height))) {
         std::string new_name = GenerateRandomUsername();
         snprintf(name, sizeof(name), "%s", new_name.c_str());
         g_AndroidSettings.SetUsername(new_name);
@@ -346,9 +346,18 @@ struct nullspace {
       ImGui::PopStyleColor(2);
       ImGui::PopStyleVar(2);
       
-      // GAME MODE BUTTONS: at 45% down (matching iOS)
-      float buttons_y = io.DisplaySize.y * 0.45f;
-      float button_margin = 40.0f;
+      // ARENA SELECTION LABEL: at 42% down (above buttons, with margin from username)
+      float label_y = io.DisplaySize.y * 0.42f;
+      ImGui::SetCursorPosY(label_y);
+      ImGui::SetWindowFontScale(1.6f);
+      float label_width = ImGui::CalcTextSize("Select an arena").x;
+      ImGui::SetCursorPosX(center_x - label_width * 0.5f);
+      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Select an arena");
+      ImGui::SetWindowFontScale(1.0f);
+      
+      // GAME MODE BUTTONS: at 50% down (with margin from label)
+      float buttons_y = io.DisplaySize.y * 0.50f;
+      float button_margin = io.DisplaySize.x * 0.10f;  // 10% margins on each side
       float button_width = io.DisplaySize.x - (button_margin * 2);
       float button_height = 140.0f;
       float button_spacing = 90.0f;  // Space between buttons (matching iOS 90px)
@@ -766,7 +775,8 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
 
       if (self) {
         // Check ALL active pointers for weapon button presses (multi-touch support)
-        if (self->ship < 8 && (flags == AMOTION_EVENT_ACTION_MOVE || flags == AMOTION_EVENT_ACTION_POINTER_DOWN || flags == AMOTION_EVENT_ACTION_DOWN)) {
+        // Don't process game input when menu is open
+        if (!game->menu_open && self->ship < 8 && (flags == AMOTION_EVENT_ACTION_MOVE || flags == AMOTION_EVENT_ACTION_POINTER_DOWN || flags == AMOTION_EVENT_ACTION_DOWN)) {
           bool gun_pressed = false;
           bool bomb_pressed = false;
           

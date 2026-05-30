@@ -627,7 +627,8 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
   bool owns_right = (ios_input.right_ptr == pointer_id);
 
   // ── Fire / ability buttons (right-slot pointer only) ──────────────────────
-  if (self->ship < 8 && owns_right &&
+  // Don't process game input when menu is open
+  if (!game->menu_open && self->ship < 8 && owns_right &&
       (flags == AMOTION_MOVE || flags == AMOTION_DOWN || flags == AMOTION_POINTER_DOWN)) {
     float button_size   = 72.0f;
     float button_radius = button_size / 2.0f;
@@ -686,7 +687,8 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
   }
 
   // ── Left-side ability icons (left-slot pointer only) ──────────────────────
-  if (self->ship < 8 && owns_left &&
+  // Don't process game input when menu is open
+  if (!game->menu_open && self->ship < 8 && owns_left &&
       flags == AMOTION_DOWN && !ios_input.abilities_triggered) {
     float item_stack_h  = 175.0f;
     float items_start_y = lh - item_stack_h - 10.0f;

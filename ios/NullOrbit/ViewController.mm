@@ -142,8 +142,8 @@
 
     // Reset button
     UIButton* reset = [UIButton buttonWithType:UIButtonTypeSystem];
-    reset.frame = CGRectMake(w - 100, h * 0.28 - 4, 80, 36);
-    [reset setTitle:@"RESET" forState:UIControlStateNormal];
+    reset.frame = CGRectMake(w - 130, h * 0.28 - 4, 110, 36);
+    [reset setTitle:@"RESET NAME" forState:UIControlStateNormal];
     [reset setTitleColor:[UIColor colorWithRed:0.87 green:0.19 blue:0.03 alpha:1.0]
                 forState:UIControlStateNormal];
     reset.layer.borderColor  = [UIColor darkGrayColor].CGColor;
@@ -152,15 +152,23 @@
     [reset addTarget:self action:@selector(onReset) forControlEvents:UIControlEventTouchUpInside];
     [menu addSubview:reset];
 
+    // Arena selection label
+    UILabel* arenaLabel = [[UILabel alloc] initWithFrame:CGRectMake(0, h * 0.42, w, 40)];
+    arenaLabel.text          = @"Select an arena";
+    arenaLabel.textColor     = [UIColor colorWithWhite:0.7 alpha:1.0];
+    arenaLabel.font          = [UIFont systemFontOfSize:16];
+    arenaLabel.textAlignment = NSTextAlignmentCenter;
+    [menu addSubview:arenaLabel];
+
     // Trench Wars CTF
     UIButton* tw = [self makeMenuButton:@"Trench Wars: Capture the Flag"
-                                  frame:CGRectMake(20, h * 0.45, w - 40, 70)];
+                                  frame:CGRectMake(20, h * 0.50, w - 40, 70)];
     [tw addTarget:self action:@selector(onJoinTW) forControlEvents:UIControlEventTouchUpInside];
     [menu addSubview:tw];
 
     // Team Deathmatch
     UIButton* tdm = [self makeMenuButton:@"Team Deathmatch"
-                                   frame:CGRectMake(20, h * 0.45 + 90, w - 40, 70)];
+                                   frame:CGRectMake(20, h * 0.50 + 90, w - 40, 70)];
     [tdm addTarget:self action:@selector(onJoinTDM) forControlEvents:UIControlEventTouchUpInside];
     [menu addSubview:tdm];
 }
