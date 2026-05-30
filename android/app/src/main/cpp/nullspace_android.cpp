@@ -913,6 +913,10 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
           android_input.touch_start_y = y;
           android_input.long_press_triggered = false;
           // Weapon button handling moved to multi-touch section above
+        } else if (flags == AMOTION_EVENT_ACTION_POINTER_UP) {
+          // Reset ability trigger flag when any pointer is lifted
+          // This allows subsequent taps while other fingers remain down
+          android_input.abilities_triggered = false;
         } else if (flags == AMOTION_EVENT_ACTION_UP) {
           android_input.anchored = false;
           android_input.joystick_active = false;
