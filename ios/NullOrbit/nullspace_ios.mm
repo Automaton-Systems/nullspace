@@ -150,6 +150,25 @@ InputState g_InputState;
 
 enum class GameScreen { MainMenu, Playing };
 
+static u32 g_PendingTouchActionMask = 0;
+
+static void QueueTouchAction(null::InputAction action) {
+  null::g_InputState.SetAction(action, true);
+  g_PendingTouchActionMask |= (1u << (u32)action);
+}
+
+static void ClearPendingTouchActions() {
+  if (!g_PendingTouchActionMask) return;
+
+  for (u32 bit = 0; bit < 32; ++bit) {
+    if (g_PendingTouchActionMask & (1u << bit)) {
+      null::g_InputState.SetAction((null::InputAction)bit, false);
+    }
+  }
+
+  g_PendingTouchActionMask = 0;
+}
+
 // ── nullspace game struct ─────────────────────────────────────────────────────
 struct nullspace_ios_state {
   null::MemoryArena perm_arena;
@@ -278,6 +297,7 @@ struct nullspace_ios_state {
       game->connection.Tick();
 
       if (!game->Update(g_InputState, dt)) {
+        ClearPendingTouchActions();
         glUseProgram(0);
         screen = GameScreen::MainMenu;
         game->Cleanup();
@@ -285,6 +305,8 @@ struct nullspace_ios_state {
         // Notify ViewController to re-show menu (done by polling iOSIsInGame())
         return true;
       }
+
+      ClearPendingTouchActions();
 
       game->Render(dt);
     }
@@ -712,7 +734,7 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
 
   // ── Bottom ability icons (right-slot pointer only) ────────────────────────
   // Don't process game input when menu is open
-  // Now horizontal at bottom, rotated 90° CCW, matching Android layout
+  // One-shot taps are latched until the next frame so quick presses aren't lost.
   if (!game->menu_open && self->ship < 8 && owns_right &&
       flags == AMOTION_DOWN && !ios_input.abilities_triggered) {
     float ability_y = lh;  // At screen bottom
@@ -739,7 +761,7 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
             break;
           default: act = null::InputAction::Burst; break;
         }
-        g_InputState.SetAction(act, true);
+        QueueTouchAction(act);
         ios_input.abilities_triggered = true;
       }
     }
@@ -752,6 +774,8 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
     ios_input.long_press_triggered = false;
 
   } else if (flags == AMOTION_UP) {
+    ios_input.abilities_triggered = false;
+
     // Release the slot owned by this pointer
     if (owns_left) {
       ios_input.left_ptr        = -1;
@@ -775,16 +799,6 @@ static void HandleTouchEvent(int flags, float x, float y, long pointer_id,
         g_InputState.SetAction(null::InputAction::Bullet,      false);
         g_InputState.SetAction(null::InputAction::Bomb,        false);
         g_InputState.SetAction(null::InputAction::Mine,        false);
-      }
-      // One-shot ability actions cleared on any finger up
-      if (owns_left || owns_right) {
-        g_InputState.SetAction(null::InputAction::Burst,       false);
-        g_InputState.SetAction(null::InputAction::Repel,       false);
-        g_InputState.SetAction(null::InputAction::Decoy,       false);
-        g_InputState.SetAction(null::InputAction::Thor,        false);
-        g_InputState.SetAction(null::InputAction::Brick,       false);
-        g_InputState.SetAction(null::InputAction::Rocket,      false);
-        g_InputState.SetAction(null::InputAction::Portal,      false);
       }
     }
 
