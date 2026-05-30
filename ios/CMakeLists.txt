@@ -124,9 +124,7 @@ set_target_properties(NullOrbit PROPERTIES
     # Prefix header: forces Foundation/UIKit before glad's GL header guards
     XCODE_ATTRIBUTE_GCC_PREFIX_HEADER        "${CMAKE_CURRENT_SOURCE_DIR}/NullOrbit/NullOrbit-Prefix.pch"
     XCODE_ATTRIBUTE_GCC_PRECOMPILE_PREFIX_HEADER "YES"
-    # Disable code-signing so the simulator build works without a developer account
-    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY       ""
-    XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED    "NO"
-    XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED     "NO"
+    XCODE_ATTRIBUTE_DEVELOPMENT_TEAM         "2A9K3N2KPN"
+    XCODE_ATTRIBUTE_CODE_SIGN_STYLE          "Automatic"
     XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH         "YES"
     XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon")

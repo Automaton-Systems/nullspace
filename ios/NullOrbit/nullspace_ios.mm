@@ -501,7 +501,7 @@ void iOSInit(void* eagl_layer, int physical_width, int physical_height, float sc
   
   const float kOriginalGameScale = 3.0f;  // Original scale that worked well
   const float kPhoneScaleRatio = 1.0f;    // Phones use original scale
-  const float kTabletScaleRatio = 0.67f;  // Tablets scale down to show more content
+  const float kTabletScaleRatio = 1.0f;   // Tablets use same tile density; physical size of screen makes UI larger
   
   float game_scale;
   
