@@ -24,6 +24,40 @@ namespace null {
 constexpr u32 kRepelDelayTicks = 50;
 constexpr u32 kMaxExhaustIndex = 1024;
 
+struct MobileEnergyHudLayout {
+  float bar_half_width;
+  float number_anchor_x;
+};
+
+static MobileEnergyHudLayout GetMobileEnergyHudLayout(const Camera& ui_camera, int reserved_energy) {
+  constexpr float kRadarBorder = 6.0f;      // Must match Radar.cpp
+  constexpr float kRadarGap = 8.0f;
+  constexpr float kBarNumberGap = 3.0f;
+  constexpr float kDigitWidth = 16.0f;
+  constexpr float kMinBarHalfWidth = 24.0f;
+
+  s16 radar_dim = ((((u16)ui_camera.surface_dim.x / 6) / 4) * 8) / 2;
+  float radar_left_x = ui_camera.surface_dim.x - radar_dim - kRadarBorder;
+
+  int digit_count = 1;
+  int tmp = reserved_energy;
+  while (tmp >= 10) {
+    ++digit_count;
+    tmp /= 10;
+  }
+
+  float number_anchor_x = radar_left_x - kRadarGap;
+  float number_left_x = number_anchor_x - digit_count * kDigitWidth;
+  float bar_right_x = number_left_x - kBarNumberGap;
+  float bar_half_width = bar_right_x - ui_camera.surface_dim.x * 0.5f;
+
+  if (bar_half_width < kMinBarHalfWidth) {
+    bar_half_width = kMinBarHalfWidth;
+  }
+
+  return {bar_half_width, number_anchor_x};
+}
+
 static void OnCollectedPrizePkt(void* user, u8* pkt, size_t size) {
   ShipController* controller = (ShipController*)user;
 
@@ -831,15 +865,8 @@ void ShipController::Render(Camera& ui_camera, Camera& camera, SpriteRenderer& r
   int energy = (int)self->energy;
 
 #ifdef NULLSPACE_MOBILE
-  // The energy bar spans [center - kAndroidBarWidth, center + kAndroidBarWidth]
-  // (RenderEnergyDisplay draws two halves of width kBarWidth on either side of center).
-  constexpr float kAndroidBarWidth = 160.0f;  // Must match RenderEnergyDisplay
-  float bar_right_x = ui_camera.surface_dim.x * 0.5f + kAndroidBarWidth;
-  // Compute how many digits we need so we can right-anchor the existing render loop.
-  int digit_count = 1;
-  int tmp = energy;
-  while (tmp >= 10) { ++digit_count; tmp /= 10; }
-  float anchor_x = bar_right_x + 3.0f + digit_count * 16.0f;
+  MobileEnergyHudLayout hud_layout = GetMobileEnergyHudLayout(ui_camera, (int)ship.energy);
+  float anchor_x = hud_layout.number_anchor_x;
 #else
   float anchor_x = ui_camera.surface_dim.x;
 #endif
@@ -1213,7 +1240,7 @@ void ShipController::RenderEnergyDisplay(Camera& ui_camera, SpriteRenderer& rend
 
   SpriteRenderable top_display_full = Graphics::anim_health_high.frames[5];
 #ifdef NULLSPACE_MOBILE
-  const float kBarWidth = 160.0f;
+  const float kBarWidth = GetMobileEnergyHudLayout(ui_camera, (int)ship.energy).bar_half_width;
 #else
   const float kBarWidth = 240.0f;
 #endif
