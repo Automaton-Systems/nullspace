@@ -548,46 +548,66 @@ void init(struct android_app* app) {
   ImGui_ImplAndroid_Init(g_App->window);
   ImGui_ImplOpenGL3_Init("#version 300 es");
 
-  // Calculate scale based on display density for better DPI awareness
-  // Base scale of 3.0f works well for 420 dpi displays (like emulator)
-  // Scale proportionally for higher/lower DPI displays
+  // Calculate scale based on display density and screen size for better DPI awareness
+  // Detect tablet vs phone to apply appropriate scaling
   AConfiguration* config = AConfiguration_new();
   AConfiguration_fromAssetManager(config, g_App->activity->assetManager);
   int32_t density = AConfiguration_getDensity(config);
+  int32_t screen_width_dp = AConfiguration_getScreenWidthDp(config);
+  int32_t screen_height_dp = AConfiguration_getScreenHeightDp(config);
   AConfiguration_delete(config);
   
+  // Determine smallest width in dp (for tablet detection)
+  int32_t smallest_width_dp = (screen_width_dp < screen_height_dp) ? screen_width_dp : screen_height_dp;
+  bool is_tablet = smallest_width_dp >= 600;  // 600dp is Android's tablet threshold
+  
+  // Reference: Galaxy S25U is 560 DPI, works well with (560/420)*1.8 = 2.4 scale
+  // Reference: Typical tablet is 240-320 DPI, needs different approach
+  // Reference: iPhone 8+ equiv ~326 DPI would get (326/420)*1.8 = 1.4 scale (too small, overflows)
+  
   const float kBaseDensity = 420.0f;
+  const float kPhoneScaleMultiplier = 1.8f;
+  const float kTabletScaleMultiplier = 3.0f;  // Tablets use higher multiplier to maintain readable UI
+  
+  // ImGui menu uses base scale for element sizing
   const float kBaseScale = 3.0f;
-  const float kGameScaleMultiplier = 1.8f;  // Extra scaling for in-game rendering only
-  
-  // Base DPI scale for font sizing
-  float base_dpi_scale = density / kBaseDensity;
-  
-  // ImGui menu uses original base scale for element sizing (not DPI scaled)
   null::g_nullspace.scale = kBaseScale;
   
-  // Game scale with multiplier for logical dimensions (in-game rendering only)
-  float game_dpi_scale = base_dpi_scale * kGameScaleMultiplier;
+  // Calculate density scale
+  float density_scale = density / kBaseDensity;
   
-  // Load Fonts with increased DPI scaling for better readability on high-DPI displays
+  // Apply different multipliers for phones vs tablets
+  float game_scale;
+  if (is_tablet) {
+    // Tablets: Higher multiplier to keep UI readable on larger screens
+    // Matches iOS tablet approach (~2x scale for typical tablet DPI)
+    game_scale = density_scale * kTabletScaleMultiplier;
+  } else {
+    // Phones: Original scaling formula, but with clamping for low-DPI devices
+    game_scale = density_scale * kPhoneScaleMultiplier;
+    
+    // Clamp to prevent overflow on low-resolution screens
+    // Minimum 1.4 keeps UI readable even on low-DPI devices
+    if (game_scale < 1.4f) game_scale = 1.4f;
+  }
+  
+  // Calculate density scale for font sizing
+  float base_dpi_scale = density / 420.0f;
+  
+  // Load Fonts with DPI scaling for readability
   ImFontConfig font_cfg;
-  font_cfg.SizePixels = 22.0f * base_dpi_scale * 1.5f;  // 1.5x larger font
+  font_cfg.SizePixels = 22.0f * base_dpi_scale * 1.5f;
   io.Fonts->AddFontDefault(&font_cfg);
   
-  // Note: Ship texture will be loaded lazily after platform is set up
-  
-  // Calculate logical dimensions for game rendering (with extra multiplier for larger UI)
-  // The game will render to these logical dimensions, and OpenGL will scale to physical resolution
-  int logical_width = (int)(surface_width / game_dpi_scale);
-  int logical_height = (int)(surface_height / game_dpi_scale);
+  // Calculate logical dimensions for game rendering
+  int logical_width = (int)(surface_width / game_scale);
+  int logical_height = (int)(surface_height / game_scale);
   
   __android_log_print(ANDROID_LOG_INFO, g_LogTag, 
-                      "Display density: %d, Base DPI: %.2f, Game DPI: %.2f, Physical: %dx%d, Logical: %dx%d", 
-                      density, base_dpi_scale, game_dpi_scale, surface_width, surface_height, logical_width, logical_height);
+                      "Device: %s, Density: %d, Size: %dx%d dp, Scale: %.2f, Physical: %dx%d, Logical: %dx%d", 
+                      is_tablet ? "Tablet" : "Phone", density, screen_width_dp, screen_height_dp,
+                      game_scale, surface_width, surface_height, logical_width, logical_height);
   
-  // Don't scale ImGui style - keep elements at original size
-  // (Font is already scaled, windows use scale variable for sizing)
-
   g_Initialized = true;
 
   null::g_nullspace.Initialize();

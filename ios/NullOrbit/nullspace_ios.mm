@@ -464,7 +464,7 @@ static void ConfigureRenderViewport(float screen_scale) {
 }
 
 // ── Public C interface ─────────────────────────────────────────────────────────
-void iOSInit(void* eagl_layer, int physical_width, int physical_height, float screen_scale) {
+void iOSInit(void* eagl_layer, int physical_width, int physical_height, float screen_scale, bool is_tablet) {
   if (g_Initialized) return;
 
   CAEAGLLayer* layer = (__bridge CAEAGLLayer*)eagl_layer;
@@ -495,17 +495,35 @@ void iOSInit(void* eagl_layer, int physical_width, int physical_height, float sc
   null::InitializeSettings();
   null::g_IOSSettings.Load();
 
-  const float kGameScale = 3.0f;
-  g_State.surface_width   = (int)(render_w / kGameScale);
-  g_State.surface_height  = (int)(render_h / kGameScale);
+  // Calculate game scale based on device type and screen scale
+  // Reference: Original working scale was 3.0 for iPhones
+  // This gave good results on iPhone 17 Pro and similar devices
+  
+  const float kOriginalGameScale = 3.0f;  // Original scale that worked well
+  const float kPhoneScaleRatio = 1.0f;    // Phones use original scale
+  const float kTabletScaleRatio = 0.67f;  // Tablets scale down to show more content
+  
+  float game_scale;
+  
+  if (is_tablet) {
+    // iPad: Reduce scale to fit more content on larger screens
+    game_scale = kOriginalGameScale * kTabletScaleRatio;
+  } else {
+    // iPhone: Use original scale that was working
+    game_scale = kOriginalGameScale * kPhoneScaleRatio;
+  }
+  
+  g_State.surface_width   = (int)(render_w / game_scale);
+  g_State.surface_height  = (int)(render_h / game_scale);
   g_State.physical_width  = render_w;
   g_State.physical_height = render_h;
   g_State.scale           = screen_scale;
 
   if (NULLSPACE_IOS_DEBUG_LOG) {
-    NSLog(@"[nullspace] startup physical=%dx%d viewport=%dx%d logical=%dx%d scale=%.2f",
+    NSLog(@"[nullspace] startup device=%@ physical=%dx%d viewport=%dx%d logical=%dx%d nativeScale=%.1f gameScale=%.2f",
+          is_tablet ? @"iPad" : @"iPhone",
           g_PhysicalWidth, g_PhysicalHeight, render_w, render_h,
-          g_State.surface_width, g_State.surface_height, screen_scale);
+          g_State.surface_width, g_State.surface_height, screen_scale, game_scale);
   }
 
   g_State.Initialize();

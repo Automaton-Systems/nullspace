@@ -107,7 +107,8 @@
     layer.contentsScale = scale;
     // Don't override layer.bounds — let it match the view (gameView.frame above).
 
-    iOSInit((__bridge void*)layer, physW, physH, scale);
+    bool isTablet = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad);
+    iOSInit((__bridge void*)layer, physW, physH, scale, isTablet);
 
     [self updateUsernameLabel];
 }
