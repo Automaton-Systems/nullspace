@@ -65,7 +65,7 @@ mkdir -p ~/.android/avd/nullspace_dev.avd
 ```bash
 cd android
 ./gradlew installDebug
-~/Android/Sdk/platform-tools/adb shell am start -n com.plushnode.nullspace/.MainActivity
+~/Android/Sdk/platform-tools/adb shell am start -n com.systems.automaton.nullorbit/.MainActivity
 ```
 
 > **Note:** Before connecting, ensure an ASSS server is running (see [Server Setup](#server-setup) section). When using the emulator, the app will connect to 10.0.2.2:5000 by default, which maps to localhost:5000 on your host machine.
@@ -111,8 +111,8 @@ landscape_y = 1080 - portrait_x
 **Full Automated Workflow:**
 ```bash
 # Stop, restart, and connect to server
-adb shell am force-stop com.plushnode.nullspace
-adb shell am start -n com.plushnode.nullspace/.MainActivity
+adb shell am force-stop com.systems.automaton.nullorbit
+adb shell am start -n com.systems.automaton.nullorbit/.MainActivity
 sleep 4
 adb shell input tap 1703 648  # Click Play
 sleep 3
