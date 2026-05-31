@@ -197,7 +197,7 @@
     self.titleLabel.frame      = CGRectMake(ox, h * 0.08, uw, 70);
     // Username label with percentage-based padding from right edge (for Reset button)
     CGFloat resetWidth = uw * 0.30;  // 30% of usable width for reset button
-    CGFloat resetHeight = h * 0.03;   // 3% of screen height
+    CGFloat resetHeight = h * 0.09;   // ~36pt on typical screen, matches original padding
     self.usernameLabel.frame   = CGRectMake(ox + 20, h * 0.28, uw - resetWidth - 30, 28);
     self.resetButton.frame     = CGRectMake(ox + uw - resetWidth - 10, h * 0.28 - 4, resetWidth, resetHeight);
     self.arenaLabel.frame      = CGRectMake(ox, h * 0.42, uw, 40);
