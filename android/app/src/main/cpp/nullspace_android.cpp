@@ -1208,8 +1208,7 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             }
           } else {
             // Ship mode: Virtual D-Pad in bottom-left for flying
-            float logical_x = x * (null::g_nullspace.surface_width / (float)screen_width);
-            float logical_y = y * (null::g_nullspace.surface_height / (float)screen_height);
+            // Check ALL pointers for d-pad input (multi-touch support)
             float logical_screen_height = (float)null::g_nullspace.surface_height;
             
             // D-pad position: 20px from left and 20px from bottom (equal padding)
@@ -1220,13 +1219,36 @@ static int32_t handleInputEvent(struct android_app* app, AInputEvent* inputEvent
             float button_y = logical_screen_height - button_size - 55.0f;  // Match weapon buttons
             float dpad_center_y = button_y + button_size / 2.0f - 20.0f;  // 20px higher
             
-            // Check if touch is in d-pad area (generous extended zone for dragging outside)
-            float dx = logical_x - dpad_center_x;
-            float dy = logical_y - dpad_center_y;
-            float dist = sqrtf(dx * dx + dy * dy);
+            // Check all pointers for d-pad touch
+            bool dpad_touched = false;
+            float dpad_touch_x = 0.0f;
+            float dpad_touch_y = 0.0f;
             
-            // Allow dragging well outside the d-pad - up to 3x radius
-            if (dist < dpad_radius * 3.0f) {
+            for (size_t i = 0; i < pointer_count; ++i) {
+              float px = AMotionEvent_getX(inputEvent, i);
+              float py = AMotionEvent_getY(inputEvent, i);
+              float logical_x = px * (null::g_nullspace.surface_width / (float)screen_width);
+              float logical_y = py * (null::g_nullspace.surface_height / (float)screen_height);
+              
+              // Check if this pointer is in d-pad area
+              float dx = logical_x - dpad_center_x;
+              float dy = logical_y - dpad_center_y;
+              float dist = sqrtf(dx * dx + dy * dy);
+              
+              // Allow dragging well outside the d-pad - up to 3x radius
+              if (dist < dpad_radius * 3.0f) {
+                dpad_touched = true;
+                dpad_touch_x = logical_x;
+                dpad_touch_y = logical_y;
+                break;  // Found d-pad touch, use this pointer
+              }
+            }
+            
+            if (dpad_touched) {
+              // Calculate distance from d-pad center
+              float dx = dpad_touch_x - dpad_center_x;
+              float dy = dpad_touch_y - dpad_center_y;
+              float dist = sqrtf(dx * dx + dy * dy);
               android_input.joystick_active = (dist > 15.0f);  // Dead zone (increased from 10)
               
               if (android_input.joystick_active) {
