@@ -12,6 +12,7 @@
 @property (nonatomic, strong) UILabel*       arenaLabel;
 @property (nonatomic, strong) UIButton*      twButton;
 @property (nonatomic, strong) UIButton*      tdmButton;
+@property (nonatomic, strong) UIButton*      chaosButton;
 @property (nonatomic, strong) CADisplayLink* displayLink;
 @property (nonatomic)         BOOL           gameInitialized;
 @property (nonatomic)         BOOL           requestedLandscapeGeometry;
@@ -175,6 +176,10 @@
     self.tdmButton = [self makeMenuButton:@"Team Deathmatch" frame:CGRectMake(0,0,0,0)];
     [self.tdmButton addTarget:self action:@selector(onJoinTDM) forControlEvents:UIControlEventTouchUpInside];
     [menu addSubview:self.tdmButton];
+
+    self.chaosButton = [self makeMenuButton:@"Team Deathmatch\nChaos!" frame:CGRectMake(0,0,0,0)];
+    [self.chaosButton addTarget:self action:@selector(onJoinChaos) forControlEvents:UIControlEventTouchUpInside];
+    [menu addSubview:self.chaosButton];
 }
 
 // Recomputes all menu frames using current safe area insets. Called from viewDidLayoutSubviews.
@@ -190,11 +195,26 @@
     CGFloat uw = w - marginH - marginR; // usable width
 
     self.titleLabel.frame      = CGRectMake(ox, h * 0.08, uw, 70);
-    self.usernameLabel.frame   = CGRectMake(ox + 20, h * 0.28, uw - 130, 28);
-    self.resetButton.frame     = CGRectMake(ox + uw - 120, h * 0.28 - 4, 110, 36);
+    // Username label with percentage-based padding from right edge (for Reset button)
+    CGFloat resetWidth = uw * 0.30;  // 30% of usable width for reset button
+    CGFloat resetHeight = h * 0.03;   // 3% of screen height
+    self.usernameLabel.frame   = CGRectMake(ox + 20, h * 0.28, uw - resetWidth - 30, 28);
+    self.resetButton.frame     = CGRectMake(ox + uw - resetWidth - 10, h * 0.28 - 4, resetWidth, resetHeight);
     self.arenaLabel.frame      = CGRectMake(ox, h * 0.42, uw, 40);
-    self.twButton.frame        = CGRectMake(ox + 20, h * 0.50, uw - 40, 70);
-    self.tdmButton.frame       = CGRectMake(ox + 20, h * 0.50 + 90, uw - 40, 70);
+    
+    // Trench Wars button (15% of screen height - taller)
+    CGFloat twHeight = h * 0.15;
+    CGFloat buttonSpacing = h * 0.04;  // 4% of screen height for spacing
+    self.twButton.frame        = CGRectMake(ox + 20, h * 0.50, uw - 40, twHeight);
+    
+    // TDM buttons side by side (below Trench Wars)
+    CGFloat tdmY = h * 0.50 + twHeight + buttonSpacing;
+    CGFloat buttonPadding = uw * 0.04;  // 4% of usable width between buttons
+    CGFloat tdmWidth = (uw - 40 - buttonPadding) / 2.0;
+    CGFloat tdmHeight = h * 0.12;  // 12% of screen height (shorter than TW)
+    
+    self.tdmButton.frame       = CGRectMake(ox + 20, tdmY, tdmWidth, tdmHeight);
+    self.chaosButton.frame     = CGRectMake(ox + 20 + tdmWidth + buttonPadding, tdmY, tdmWidth, tdmHeight);
 }
 
 - (UIButton*)makeMenuButton:(NSString*)title frame:(CGRect)frame {
@@ -204,6 +224,9 @@
     [btn setTitleColor:[UIColor colorWithRed:0.937 green:0.678 blue:0.129 alpha:1.0]
               forState:UIControlStateNormal];
     btn.titleLabel.font = [UIFont boldSystemFontOfSize:18];
+    btn.titleLabel.numberOfLines = 0;  // Support multiline text
+    btn.titleLabel.lineBreakMode = NSLineBreakByWordWrapping;
+    btn.titleLabel.textAlignment = NSTextAlignmentCenter;
     btn.backgroundColor = [UIColor colorWithWhite:0.14 alpha:1.0];
     btn.layer.cornerRadius = 8;
     return btn;
@@ -222,8 +245,9 @@
 }
 
 // server index 1 = Null Orbit production server (same as Android)
-- (void)onJoinTW  { [self startGame:1 arena:"pub"]; }
-- (void)onJoinTDM { [self startGame:1 arena:"tdm"]; }
+- (void)onJoinTW    { [self startGame:1 arena:"pub"]; }
+- (void)onJoinTDM   { [self startGame:1 arena:"tdm"]; }
+- (void)onJoinChaos { [self startGame:1 arena:"chaos"]; }
 
 // ── Game loop ────────────────────────────────────────────────────────────────
 

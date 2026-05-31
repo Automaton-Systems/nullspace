@@ -359,26 +359,41 @@ struct nullspace {
       float buttons_y = io.DisplaySize.y * 0.50f;
       float button_margin = io.DisplaySize.x * 0.10f;  // 10% margins on each side
       float button_width = io.DisplaySize.x - (button_margin * 2);
-      float button_height = 140.0f;
-      float button_spacing = 90.0f;  // Space between buttons (matching iOS 90px)
+      float tw_button_height = io.DisplaySize.y * 0.15f;  // 15% of screen height (taller)
+      float button_spacing = io.DisplaySize.y * 0.04f;  // 4% of screen height for spacing
       
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
       
-      // Trench Wars: Capture the Flag button
+      // Trench Wars: Capture the Flag button (taller)
       ImGui::SetCursorPos(ImVec2(button_margin, buttons_y));
       ImGui::SetWindowFontScale(1.8f);
-      if (ImGui::Button("Trench Wars: Capture the Flag", ImVec2(button_width, button_height))) {
+      if (ImGui::Button("Trench Wars: Capture the Flag", ImVec2(button_width, tw_button_height))) {
         selected_zone_index = 1;  // Null Orbit production server
         JoinZone(selected_zone_index, "pub");
       }
       ImGui::SetWindowFontScale(1.0f);
       
-      // Team Deathmatch button
-      ImGui::SetCursorPos(ImVec2(button_margin, buttons_y + button_height + button_spacing));
+      // TDM buttons side by side (below Trench Wars)
+      float tdm_buttons_y = buttons_y + tw_button_height + button_spacing;
+      float button_padding = io.DisplaySize.x * 0.04f;  // 4% of screen width between buttons
+      float tdm_button_width = (button_width - button_padding) / 2.0f;
+      float tdm_button_height = io.DisplaySize.y * 0.12f;  // 12% of screen height (shorter than TW)
+      
+      // Team Deathmatch button (left)
+      ImGui::SetCursorPos(ImVec2(button_margin, tdm_buttons_y));
       ImGui::SetWindowFontScale(1.8f);
-      if (ImGui::Button("Team Deathmatch", ImVec2(button_width, button_height))) {
+      if (ImGui::Button("Team Deathmatch", ImVec2(tdm_button_width, tdm_button_height))) {
         selected_zone_index = 1;  // Null Orbit production server
         JoinZone(selected_zone_index, "tdm");
+      }
+      ImGui::SetWindowFontScale(1.0f);
+      
+      // Team Deathmatch Chaos button (right) - using spaces to help center "Chaos!"
+      ImGui::SetCursorPos(ImVec2(button_margin + tdm_button_width + button_padding, tdm_buttons_y));
+      ImGui::SetWindowFontScale(1.8f);
+      if (ImGui::Button("Team Deathmatch\n     Chaos!", ImVec2(tdm_button_width, tdm_button_height))) {
+        selected_zone_index = 1;  // Null Orbit production server
+        JoinZone(selected_zone_index, "chaos");
       }
       ImGui::SetWindowFontScale(1.0f);
       
