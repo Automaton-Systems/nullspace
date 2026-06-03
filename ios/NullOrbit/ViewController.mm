@@ -8,6 +8,7 @@
 @property (nonatomic, strong) UIView*        menuView;
 @property (nonatomic, strong) UILabel*       usernameLabel;
 @property (nonatomic, strong) UILabel*       titleLabel;
+@property (nonatomic, strong) UILabel*       rotateLabel;
 @property (nonatomic, strong) UIButton*      resetButton;
 @property (nonatomic, strong) UILabel*       arenaLabel;
 @property (nonatomic, strong) UIButton*      twButton;
@@ -16,6 +17,9 @@
 @property (nonatomic, strong) CADisplayLink* displayLink;
 @property (nonatomic)         BOOL           gameInitialized;
 @property (nonatomic)         BOOL           requestedLandscapeGeometry;
+@property (nonatomic)         BOOL           pendingStartGame;
+@property (nonatomic)         int            pendingServerIndex;
+@property (nonatomic)         const char*    pendingArena;
 @end
 
 @implementation ViewController
@@ -25,6 +29,15 @@
     self.view.backgroundColor = [UIColor blackColor];
     [self setupGameView];
     [self setupMenuView];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(sceneDidActivate:)
+                                                 name:UISceneDidActivateNotification
+                                               object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -38,6 +51,14 @@
     self.gameView.contentScaleFactor = scale;
     ((CAEAGLLayer*)self.gameView.layer).contentsScale = scale;
 
+    int physW = (int)(bounds.size.width * scale);
+    int physH = (int)(bounds.size.height * scale);
+    bool isTablet = (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad);
+
+    if (self.gameInitialized) {
+        iOSResize((__bridge void*)self.gameView.layer, physW, physH, scale, isTablet);
+    }
+
     // Pass real safe area insets (physical pixels) to the game bridge.
     // This replaces the old hardcoded 24pt symmetric padding.
     UIEdgeInsets insets = self.view.safeAreaInsets;
@@ -48,12 +69,18 @@
 
     // Re-layout UIKit menu with current safe area so buttons clear the notch.
     [self layoutMenuView];
+    [self updateMenuForOrientation];
 
     if (!self.gameInitialized &&
         bounds.size.width > 0.0 &&
-        bounds.size.height > 0.0 &&
-        bounds.size.width > bounds.size.height) {
+        bounds.size.height > 0.0) {
         [self initGame];
+    }
+
+    [self requestLandscapeGeometryIfNeeded];
+
+    if (self.pendingStartGame) {
+        [self beginGameWithServerIndex:self.pendingServerIndex arena:self.pendingArena];
     }
 }
 
@@ -62,24 +89,32 @@
     [self requestLandscapeGeometryIfNeeded];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self requestLandscapeGeometryIfNeeded];
+}
+
 - (BOOL)prefersHomeIndicatorAutoHidden { return YES; }
 
 - (void)requestLandscapeGeometryIfNeeded {
-    if (self.requestedLandscapeGeometry) return;
-    self.requestedLandscapeGeometry = YES;
+    if (self.requestedLandscapeGeometry && [self isLandscapeLayout]) {
+        return;
+    }
 
     if (@available(iOS 16.0, *)) {
         UIWindowScene* scene = self.view.window.windowScene;
         if (scene) {
+            self.requestedLandscapeGeometry = YES;
+            [self setNeedsUpdateOfSupportedInterfaceOrientations];
             UIWindowSceneGeometryPreferencesIOS* prefs =
                 [[UIWindowSceneGeometryPreferencesIOS alloc]
                     initWithInterfaceOrientations:UIInterfaceOrientationMaskLandscapeRight];
             [scene requestGeometryUpdateWithPreferences:prefs errorHandler:^(NSError* error) {
                 NSLog(@"[nullspace] landscape geometry request failed: %@", error);
             }];
-            [self setNeedsUpdateOfSupportedInterfaceOrientations];
         }
     } else {
+        self.requestedLandscapeGeometry = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
         [[UIDevice currentDevice] setValue:@(UIInterfaceOrientationLandscapeRight) forKey:@"orientation"];
@@ -105,6 +140,11 @@
     };
 
     [self.view addSubview:self.gameView];
+}
+
+- (BOOL)isLandscapeLayout {
+    CGRect bounds = self.view.bounds;
+    return bounds.size.width > bounds.size.height;
 }
 
 - (void)initGame {
@@ -152,6 +192,14 @@
     self.usernameLabel.textAlignment = NSTextAlignmentCenter;
     [menu addSubview:self.usernameLabel];
 
+    self.rotateLabel = [[UILabel alloc] initWithFrame:CGRectMake(0,0,0,0)];
+    self.rotateLabel.textColor = [UIColor colorWithRed:0.94 green:0.68 blue:0.13 alpha:1.0];
+    self.rotateLabel.font = [UIFont boldSystemFontOfSize:18];
+    self.rotateLabel.textAlignment = NSTextAlignmentCenter;
+    self.rotateLabel.numberOfLines = 0;
+    self.rotateLabel.hidden = YES;
+    [menu addSubview:self.rotateLabel];
+
     self.resetButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.resetButton setTitle:@"RESET NAME" forState:UIControlStateNormal];
     [self.resetButton setTitleColor:[UIColor colorWithRed:0.87 green:0.19 blue:0.03 alpha:1.0]
@@ -193,14 +241,21 @@
     CGFloat marginR = MAX(insets.right, 8.0);
     CGFloat ox = marginH;               // left edge of usable area
     CGFloat uw = w - marginH - marginR; // usable width
+    BOOL landscape = [self isLandscapeLayout];
 
     self.titleLabel.frame      = CGRectMake(ox, h * 0.08, uw, 70);
+    // "Landscape preferred" sits just below the title in portrait
+    CGFloat rotateLabelY       = h * 0.08 + 70 + 8;   // title bottom + 8pt gap
+    CGFloat rotateLabelH       = landscape ? 0 : 44;
+    self.rotateLabel.frame     = CGRectMake(ox + 20, rotateLabelY, uw - 40, rotateLabelH);
+    // "You can still play in portrait" / "Select an arena" sits close below rotateLabel
+    CGFloat arenaLabelY        = landscape ? h * 0.42 : rotateLabelY + rotateLabelH + 6;
+    self.arenaLabel.frame      = CGRectMake(ox, arenaLabelY, uw, 40);
     // Username label with percentage-based padding from right edge (for Reset button)
     CGFloat resetWidth = uw * 0.30;  // 30% of usable width for reset button
     CGFloat resetHeight = h * 0.09;   // ~36pt on typical screen, matches original padding
     self.usernameLabel.frame   = CGRectMake(ox + 20, h * 0.28, uw - resetWidth - 30, 28);
     self.resetButton.frame     = CGRectMake(ox + uw - resetWidth - 10, h * 0.28 - 4, resetWidth, resetHeight);
-    self.arenaLabel.frame      = CGRectMake(ox, h * 0.42, uw, 40);
     
     // Trench Wars button (15% of screen height - taller)
     CGFloat twHeight = h * 0.15;
@@ -215,6 +270,24 @@
     
     self.tdmButton.frame       = CGRectMake(ox + 20, tdmY, tdmWidth, tdmHeight);
     self.chaosButton.frame     = CGRectMake(ox + 20 + tdmWidth + buttonPadding, tdmY, tdmWidth, tdmHeight);
+}
+
+- (void)updateMenuForOrientation {
+    BOOL landscape = [self isLandscapeLayout];
+
+    if (landscape) {
+        self.rotateLabel.hidden = YES;
+        self.arenaLabel.text = @"Select an arena";
+    } else {
+        self.rotateLabel.hidden = NO;
+        self.rotateLabel.text = @"Landscape preferred for best experience";
+        self.arenaLabel.text = @"You can still play in portrait";
+    }
+
+    CGFloat buttonAlpha = 1.0;
+    self.twButton.alpha = buttonAlpha;
+    self.tdmButton.alpha = buttonAlpha;
+    self.chaosButton.alpha = buttonAlpha;
 }
 
 - (UIButton*)makeMenuButton:(NSString*)title frame:(CGRect)frame {
@@ -252,12 +325,36 @@
 // ── Game loop ────────────────────────────────────────────────────────────────
 
 - (void)startGame:(int)serverIndex arena:(const char*)arena {
+    self.pendingStartGame = YES;
+    self.pendingServerIndex = serverIndex;
+    self.pendingArena = arena;
+    [self updateMenuForOrientation];
+
+    [self requestLandscapeGeometryIfNeeded];
+
+    [self beginGameWithServerIndex:serverIndex arena:arena];
+}
+
+- (void)beginGameWithServerIndex:(int)serverIndex arena:(const char*)arena {
+    if (self.displayLink) return;
+
+    self.pendingStartGame = NO;
     self.menuView.hidden = YES;
+
+    if (!self.gameInitialized) {
+        [self initGame];
+    }
 
     iOSJoinZone(serverIndex, arena);
 
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(gameLoop)];
     [self.displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+}
+
+- (void)sceneDidActivate:(NSNotification*)notification {
+    if (notification.object == self.view.window.windowScene) {
+        [self requestLandscapeGeometryIfNeeded];
+    }
 }
 
 - (void)gameLoop {
@@ -268,6 +365,7 @@
         self.displayLink = nil;
         self.menuView.hidden = NO;
         [self updateUsernameLabel];
+        [self updateMenuForOrientation];
     }
 }
 
@@ -275,6 +373,10 @@
 
 - (UIInterfaceOrientationMask)supportedInterfaceOrientations {
     return UIInterfaceOrientationMaskLandscapeLeft | UIInterfaceOrientationMaskLandscapeRight;
+}
+
+- (BOOL)shouldAutorotate {
+    return YES;
 }
 
 - (UIInterfaceOrientation)preferredInterfaceOrientationForPresentation {

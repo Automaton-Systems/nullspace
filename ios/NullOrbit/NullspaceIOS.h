@@ -13,6 +13,9 @@ void iOSInit(void* eagl_layer, int physical_width, int physical_height, float sc
 // Update safe area insets (physical pixels). Call from viewDidLayoutSubviews.
 void iOSSetSafeArea(int left, int right, int top, int bottom);
 
+// Update framebuffer and logical surface dimensions after a live layout/orientation change.
+void iOSResize(void* eagl_layer, int physical_width, int physical_height, float screen_scale, bool is_tablet);
+
 // Render one frame and present. Called by CADisplayLink.
 void iOSTick(void);
 

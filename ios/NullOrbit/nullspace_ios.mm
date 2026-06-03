@@ -185,7 +185,8 @@ struct nullspace_ios_state {
   char password[20] = {};
   GameScreen screen = GameScreen::MainMenu;
   int64_t last_frame_ns = 0;
-  float scale       = 1.0f;
+  float render_scale = 1.0f;
+  float game_scale   = 1.0f;
 
   std::string GenerateRandomUsername() {
     static const char* first[] = {
@@ -259,6 +260,7 @@ struct nullspace_ios_state {
     game = memory_arena_construct_type(&perm_arena, null::Game,
                                         perm_arena, trans_arena, *work_queue,
                                         surface_width, surface_height);
+
     if (!game->Initialize(g_InputState)) {
       NSLog(@"[nullspace] JoinZone: game->Initialize() failed");
       return false;
@@ -444,9 +446,8 @@ static bool CreateFramebuffer(CAEAGLLayer* layer, int physical_width, int physic
   [g_Context renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, g_ColorRB);
 
-  // Query the actual renderbuffer dimensions — these come from the layer's contentsScale
-  // and bounds, which we've already forced to landscape. Use these as the truth so that
-  // the depth buffer and everything else exactly matches the color renderbuffer.
+  // Query the actual renderbuffer dimensions from the layer. Use these as the truth so
+  // the depth buffer and the game surface match the real presentation orientation.
   GLint w = 0, h = 0;
   glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH,  &w);
   glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &h);
@@ -455,8 +456,6 @@ static bool CreateFramebuffer(CAEAGLLayer* layer, int physical_width, int physic
     w = physical_width;
     h = physical_height;
   }
-  // If portrait-shaped (layer wasn't ready), swap to landscape
-  if (h > w) { GLint tmp = w; w = h; h = tmp; }
   g_PhysicalWidth  = w;
   g_PhysicalHeight = h;
 
@@ -471,6 +470,74 @@ static bool CreateFramebuffer(CAEAGLLayer* layer, int physical_width, int physic
     return false;
   }
   return true;
+}
+
+static bool ResizeFramebufferStorage(CAEAGLLayer* layer, int physical_width, int physical_height) {
+  glBindFramebuffer(GL_FRAMEBUFFER, g_Framebuffer);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, g_ColorRB);
+  [g_Context renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, g_ColorRB);
+
+  GLint w = 0, h = 0;
+  glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH,  &w);
+  glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &h);
+  if (w == 0 || h == 0) {
+    w = physical_width;
+    h = physical_height;
+  }
+
+  g_PhysicalWidth = w;
+  g_PhysicalHeight = h;
+
+  glBindRenderbuffer(GL_RENDERBUFFER, g_DepthRB);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, g_DepthRB);
+
+  GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  if (status != GL_FRAMEBUFFER_COMPLETE) {
+    NSLog(@"[nullspace] Resize framebuffer incomplete: 0x%X", status);
+    return false;
+  }
+
+  return true;
+}
+
+static float GetGameScale(bool is_tablet) {
+  const float kOriginalGameScale = 3.0f;
+  const float kPhoneScaleRatio = 1.0f;
+  const float kTabletScaleRatio = 1.0f;
+
+  return is_tablet ? (kOriginalGameScale * kTabletScaleRatio) : (kOriginalGameScale * kPhoneScaleRatio);
+}
+
+static void UpdateGameSurfaceDimensions() {
+  int render_w = g_ViewportWidth;
+  int render_h = g_ViewportHeight;
+  float game_scale = (g_State.game_scale > 0.0f) ? g_State.game_scale : 1.0f;
+
+  g_State.surface_width = (int)(render_w / game_scale);
+  g_State.surface_height = (int)(render_h / game_scale);
+  g_State.physical_width = render_w;
+  g_State.physical_height = render_h;
+
+  if (!g_State.game) return;
+
+  Vector2f surface_dim((float)g_State.surface_width, (float)g_State.surface_height);
+  float zmax = (float)Layer::Count;
+
+  g_State.game->camera.surface_dim = surface_dim;
+  g_State.game->camera.projection = Orthographic(-surface_dim.x / 2.0f * g_State.game->camera.scale,
+                                                 surface_dim.x / 2.0f * g_State.game->camera.scale,
+                                                 surface_dim.y / 2.0f * g_State.game->camera.scale,
+                                                 -surface_dim.y / 2.0f * g_State.game->camera.scale,
+                                                 -zmax, zmax);
+
+  g_State.game->ui_camera.surface_dim = surface_dim;
+  g_State.game->ui_camera.projection = Orthographic(0, surface_dim.x, surface_dim.y, 0, -zmax, zmax);
+  g_State.game->connection.view_dim = surface_dim;
+  g_State.game->statbox.sliding_view.max_size = (g_State.surface_height * 3) / (4 * 12);
+  g_State.game->RecreateRadar();
 }
 
 static void ConfigureRenderViewport(float screen_scale) {
@@ -503,10 +570,26 @@ void iOSSetSafeArea(int left, int right, int top, int bottom) {
   g_SafeBottom = bottom;
   // If already initialized, reconfigure the viewport live.
   if (g_Initialized) {
-    ConfigureRenderViewport(g_State.scale);
-    g_State.surface_width  = g_ViewportWidth  / (int)(g_State.scale > 0 ? g_State.scale : 1);
-    g_State.surface_height = g_ViewportHeight / (int)(g_State.scale > 0 ? g_State.scale : 1);
+    ConfigureRenderViewport(g_State.render_scale);
+    UpdateGameSurfaceDimensions();
   }
+}
+
+void iOSResize(void* eagl_layer, int physical_width, int physical_height, float screen_scale, bool is_tablet) {
+  if (!g_Initialized) return;
+
+  CAEAGLLayer* layer = (__bridge CAEAGLLayer*)eagl_layer;
+  [EAGLContext setCurrentContext:g_Context];
+
+  g_State.render_scale = screen_scale;
+  g_State.game_scale = GetGameScale(is_tablet);
+
+  if (!ResizeFramebufferStorage(layer, physical_width, physical_height)) {
+    return;
+  }
+
+  ConfigureRenderViewport(g_State.render_scale);
+  UpdateGameSurfaceDimensions();
 }
 
 void iOSInit(void* eagl_layer, int physical_width, int physical_height, float screen_scale, bool is_tablet) {
@@ -540,35 +623,18 @@ void iOSInit(void* eagl_layer, int physical_width, int physical_height, float sc
   null::InitializeSettings();
   null::g_IOSSettings.Load();
 
-  // Calculate game scale based on device type and screen scale
-  // Reference: Original working scale was 3.0 for iPhones
-  // This gave good results on iPhone 17 Pro and similar devices
-  
-  const float kOriginalGameScale = 3.0f;  // Original scale that worked well
-  const float kPhoneScaleRatio = 1.0f;    // Phones use original scale
-  const float kTabletScaleRatio = 1.0f;   // Tablets use same tile density; physical size of screen makes UI larger
-  
-  float game_scale;
-  
-  if (is_tablet) {
-    // iPad: Reduce scale to fit more content on larger screens
-    game_scale = kOriginalGameScale * kTabletScaleRatio;
-  } else {
-    // iPhone: Use original scale that was working
-    game_scale = kOriginalGameScale * kPhoneScaleRatio;
-  }
-  
-  g_State.surface_width   = (int)(render_w / game_scale);
-  g_State.surface_height  = (int)(render_h / game_scale);
+  g_State.render_scale    = screen_scale;
+  g_State.game_scale      = GetGameScale(is_tablet);
+  g_State.surface_width   = (int)(render_w / g_State.game_scale);
+  g_State.surface_height  = (int)(render_h / g_State.game_scale);
   g_State.physical_width  = render_w;
   g_State.physical_height = render_h;
-  g_State.scale           = screen_scale;
 
   if (NULLSPACE_IOS_DEBUG_LOG) {
     NSLog(@"[nullspace] startup device=%@ physical=%dx%d viewport=%dx%d logical=%dx%d nativeScale=%.1f gameScale=%.2f",
           is_tablet ? @"iPad" : @"iPhone",
           g_PhysicalWidth, g_PhysicalHeight, render_w, render_h,
-          g_State.surface_width, g_State.surface_height, screen_scale, game_scale);
+          g_State.surface_width, g_State.surface_height, screen_scale, g_State.game_scale);
   }
 
   g_State.Initialize();
